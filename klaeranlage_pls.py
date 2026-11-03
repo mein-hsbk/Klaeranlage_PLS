@@ -2659,7 +2659,7 @@ def _(
                     Wartungsprüfungen aufgenommen. Ein Vergleich mit der Werkskennlinie zeigt
                     Verschleiß an Laufrad oder Gehäuse.
                 </p>
-                <a href="https://thurin27.github.io/Kennlinien_messen/"
+                <a href="https://mein-hsbk.github.io/Kennlinien_messen/"
                    target="_blank"
                    style="display:inline-block;padding:8px 20px;background:#0984e3;color:#fff;
                           border-radius:4px;text-decoration:none;font-weight:bold;font-size:0.9em;margin-top:4px">
@@ -2700,7 +2700,7 @@ def _(
                         Bei steigendem Zulauf (z.B. Regen) muss die Drehzahl schnell nachgeführt werden,
                         um Überflutung zu vermeiden – ein klassisches Füllstandsregelungsproblem.
                     </p>
-                    <a href="https://thurin27.github.io/Fuellstandsregelung/"
+                    <a href="https://mein-hsbk.github.io/Fuellstandsregelung/"
                        target="_blank"
                        style="display:inline-block;padding:8px 20px;background:#0984e3;color:#fff;
                               border-radius:4px;text-decoration:none;font-weight:bold;font-size:0.9em">
@@ -2730,7 +2730,7 @@ def _(
                         basierend auf dem P-ges-Messwert im Ablauf. Die Totzeit entsteht durch die
                         Fließstrecke zwischen Dosierstelle und Messstelle (ca. 20–45 min).
                     </p>
-                    <a href="https://thurin27.github.io/Simulation_Phosphatfaellung/"
+                    <a href="https://mein-hsbk.github.io/Simulation_Phosphatfaellung/"
                        target="_blank"
                        style="display:inline-block;padding:8px 20px;background:#a29bfe;color:#1a1a2e;
                               border-radius:4px;text-decoration:none;font-weight:bold;font-size:0.9em">
