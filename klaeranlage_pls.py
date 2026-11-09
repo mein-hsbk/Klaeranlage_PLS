@@ -4780,7 +4780,7 @@ def _(
             "HS-101": dict(
                 kks="HS-101", kurz="Plattenschieber", einbau="Zulauf zum Pumpensumpf / Hebewerk",
                 anlagenteil="Mech. Reinigung", hersteller="KSB", modell="HERA-BD",
-                dn=300, pn=10, werkstoff="5.3106 / EPDM", baujahr=2020, serien="123456",
+                dn=300, pn=6, werkstoff="5.3106 / EPDM", baujahr=2020, serien="123456",
                 medium="Abwasser", t_max=60, p_max=5, antrieb="Handrad",
                 stellung="AUF", bh=32850, wartung="06/2023",
                 zustand="defekt",
@@ -4797,7 +4797,7 @@ def _(
             "HS-202": dict(
                 kks="HS-202", kurz="Plattenschieber", einbau="Zulauf Vorklärung VK1",
                 anlagenteil="Mech. Reinigung", hersteller="KSB", modell="HERA-BD",
-                dn=400, pn=10, werkstoff="5.3106 / EPDM", baujahr=2015, serien="098112",
+                dn=400, pn=6, werkstoff="5.3106 / EPDM", baujahr=2015, serien="098112",
                 medium="Rohabwasser", t_max=60, p_max=5, antrieb="E-Stellantrieb / Handrad",
                 stellung="AUF", bh=73410, wartung="04/2024", zustand="ok", meldung="",
             ),
@@ -5158,6 +5158,53 @@ def _(
     terminiert die Maßnahme mit der Instandhaltung. Bei Störungsmeldungen (Priorität HOCH) erfolgt
     die Kontaktaufnahme binnen 30 Minuten.
   </div>
+</div>'''
+                # --- Rückmeldung der Werkstatt (nur Lernsituation HS-101, Bügelschaden) ---
+                if _sel_kks == "HS-101":
+                    _rm_zeit = (_dt.datetime.now() + _dt.timedelta(minutes=17)).strftime("%H:%M")
+                    wartung_html += f'''
+<div style="background:#f5f8fc;color:#1a1a2e;border:2px solid #1F4E79;border-radius:6px;padding:16px 20px;margin-top:14px;font-family:Arial,Helvetica,sans-serif;font-size:0.9em;line-height:1.45">
+  <div style="display:flex;justify-content:space-between;align-items:baseline;border-bottom:2px solid #1F4E79;padding-bottom:6px;margin-bottom:10px">
+    <div style="font-weight:bold;color:#1F4E79;font-size:1.05em">📞 Rückmeldung Instandhaltung / Werkstatt</div>
+    <div style="font-size:0.85em;color:#555">zu Auftrag {_auftrag_nr} · heute, {_rm_zeit} Uhr</div>
+  </div>
+  <p style="margin:0 0 8px"><strong>Von:</strong> Werkstattmeister Instandhaltung<br>
+  <strong>An:</strong> Anlagenfahrer (Auszubildende/-r)</p>
+  <p style="margin:0 0 8px">Moin, euer Auftrag ist angekommen. Ich war gerade am Pumpensumpf und habe mir HS-101 angesehen:
+  Der <strong>Bügel (Pos. 166)</strong> ist durch den Anfahrschaden bleibend verbogen. Alles andere sieht auf den ersten Blick
+  in Ordnung aus. KSB kann den Bügel nicht liefern – wir fertigen ihn selbst in unserer Werkstatt.
+  Den alten Bügel habe ich ausgebaut und eine Zeichnung davon angefertigt (liegt euch vor).</p>
+  <p style="margin:0 0 4px">Bitte bereitet bis zur nächsten Besprechung Folgendes vor:</p>
+  <ol style="margin:0 0 10px;padding-left:22px;list-style:decimal outside">
+    <li><strong>Werkstoff für den neuen Bügel festlegen</strong> – mit nachvollziehbarer Begründung.
+        Der Originalwerkstoff S275JR ist nicht am Lager. Eine Bestellung dauert ca. 3 Wochen –
+        so lange können wir den Zulauf nicht ohne funktionsfähigen Schieber lassen. Nehmt also bitte
+        etwas aus dem Lagerbestand (siehe unten).</li>
+    <li><strong>Arbeitsplan für die Fertigung des Bügels</strong> (Zuschnitt, Bearbeitung, Biegen, Korrosionsschutz, Prüfung).</li>
+    <li><strong>Arbeitsplan für Ausbau, Wartung und Wiedereinbau</strong> des Schiebers. Wenn die Armatur schon draußen ist,
+        machen wir die fällige Wartung gleich mit (letzte Wartung 06/2023).</li>
+  </ol>
+  <div style="font-weight:bold;color:#1F4E79;margin:6px 0 4px">Lagerbestand Blech (Werkstatt, Regal B)</div>
+  <table style="border-collapse:collapse;width:100%;max-width:560px;font-size:0.95em">
+    <tr style="background:#1F4E79;color:#fff">
+      <th style="text-align:left;padding:4px 8px">Werkstoff</th>
+      <th style="text-align:left;padding:4px 8px">Abmessung (Tafel)</th>
+      <th style="text-align:right;padding:4px 8px">Preis</th></tr>
+    <tr style="background:#dde8f3"><td style="padding:4px 8px">S235JR</td><td style="padding:4px 8px">1200 × 800 × 7 mm</td><td style="padding:4px 8px;text-align:right">1000 €/t</td></tr>
+    <tr><td style="padding:4px 8px">EN AW-6082-T6</td><td style="padding:4px 8px">800 × 600 × 8 mm</td><td style="padding:4px 8px;text-align:right">3600 €/t</td></tr>
+    <tr style="background:#dde8f3"><td style="padding:4px 8px">X5CrNi18-10</td><td style="padding:4px 8px">1000 × 600 × 5 mm</td><td style="padding:4px 8px;text-align:right">4400 €/t</td></tr>
+  </table>
+  <div style="font-weight:bold;color:#1F4E79;margin:12px 0 4px">Was ihr über unsere Werkstatt wissen müsst</div>
+  <ul style="margin:0;padding-left:22px;list-style:disc outside">
+    <li>Zuschnitt aus der Tafel: Tafelschere bis 6 mm, darüber Plasmaschneiden. Bandsäge und Ständerbohrmaschine sind vorhanden.</li>
+    <li>Biegen: Abkantbank mit wechselbaren Oberwerkzeugen (Biegeradien innen 5, 10, 20, 30 und 50 mm).</li>
+    <li>Schweißen: MAG und WIG möglich.</li>
+    <li>Beschichten: 2K-Epoxid können wir selbst auftragen (2 Schichten, je Schicht 24 h Trockenzeit).
+        Pulverbeschichten nur über eine Fremdfirma (ca. 1 Woche Lieferzeit).</li>
+    <li>Verrechnungssatz Werkstatt: 58 €/h.</li>
+    <li>Schrauben und Muttern aus A2 sowie Ersatzteile für die Stopfbuchspackung bestellt das Lager bei Bedarf über KSB (Lieferung 2 Tage).</li>
+  </ul>
+  <p style="margin:10px 0 0">Bei Fragen meldet euch einfach. Gruß aus der Werkstatt</p>
 </div>'''
 
         # --- Tab zusammensetzen ---
