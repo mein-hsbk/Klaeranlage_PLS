@@ -4508,6 +4508,7 @@ def _(
             <tr><td style="padding:4px 12px;color:#5a4820">Fließgeschw. Starkregen</td><td style="padding:4px 12px;font-weight:bold">v_SR = 1,80 m/s</td></tr>
             <tr style="background:#f5f0d8"><td style="padding:4px 12px;color:#5a4820">Förderpumpen</td><td style="padding:4px 12px;font-weight:bold">2 × Tauchmotor-KP (1 Betrieb, 1 Reserve)</td></tr>
             <tr><td style="padding:4px 12px;color:#5a4820">Einleitung nach</td><td style="padding:4px 12px;font-weight:bold">KA Schwierbach, Hauptzulauf</td></tr>
+            <tr style="background:#f5f0d8"><td style="padding:4px 12px;color:#5a4820">Notstauvolumen (Betreibervorgabe nach Risikobetrachtung gem. DIN EN 16932-1)</td><td style="padding:4px 12px;font-weight:bold">Starkregenzufluss mind. 30 min ohne Förderung aufnehmen</td></tr>
           </table>
           <p style="font-size:0.78em;color:#5a4820;margin:10px 0 0 0;font-style:italic;border-top:1px dashed #5a4820;padding-top:6px">
             Anmerkung: Unterlagen aus dem Bauarchiv. Geometrieangaben aus
