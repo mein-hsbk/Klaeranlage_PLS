@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
+<title>Kläranlage Schwierbach – 3D-Ansicht</title>
+<link rel="icon" href="../favicon-32x32.png">
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#bcd4e6;font-family:Arial,Helvetica,sans-serif;color:#fff;-webkit-tap-highlight-color:transparent}
+  #c{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+  #top{position:fixed;left:0;right:0;top:0;padding:calc(env(safe-area-inset-top) + 8px) 12px 8px;display:flex;align-items:center;gap:10px;
+       background:linear-gradient(#16213eee,#16213e99 70%,#16213e00);pointer-events:none}
+  #top h1{margin:0;font-size:15px;letter-spacing:.3px}
+  #top .sub{font-size:11px;color:#b2bec3;font-family:monospace}
+  #top .sp{flex:1}
+  .btn{pointer-events:auto;background:#0f3460;border:1px solid #2d4a7a;color:#fff;border-radius:6px;padding:7px 10px;font-size:13px;cursor:pointer;white-space:nowrap}
+  .btn.on{background:#00b894;border-color:#00b894;color:#0b1a2e;font-weight:bold}
+  #bottom{position:fixed;left:0;right:0;bottom:0;padding:8px 10px calc(env(safe-area-inset-bottom) + 8px);background:#16213ef0;border-top:1px solid #0f3460}
+  #tour{display:flex;align-items:center;gap:6px}
+  #tname{flex:1;text-align:center;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
+  #tname small{color:#b2bec3;font-family:monospace}
+  #opts{display:flex;gap:6px;margin-top:7px;overflow-x:auto}
+  #opts .btn{font-size:12px;padding:6px 9px}
+  #info{position:fixed;left:8px;right:8px;max-width:460px;margin:0 auto;background:#16213ef5;border:1px solid #2d4a7a;border-radius:10px;
+        padding:10px 12px 12px;display:none;max-height:42vh;overflow:auto;box-shadow:0 6px 24px #0007}
+  #info h2{margin:0 26px 2px 0;font-size:15px;color:#ffeaa7}
+  #info .kks{font-family:monospace;font-size:11px;color:#74b9ff;margin-bottom:6px}
+  #info p{font-size:12.5px;line-height:1.4;margin:6px 0 8px;color:#dfe6e9}
+  #info table{border-collapse:collapse;font-size:12px}
+  #info td{padding:3px 10px 3px 0;vertical-align:top;border-bottom:1px solid #0f3460}
+  #info td.k{color:#b2bec3;white-space:nowrap}
+  #info .note{font-size:10.5px;color:#8395a7;margin-top:6px}
+  #close{position:absolute;right:8px;top:6px;background:none;border:none;color:#b2bec3;font-size:20px;cursor:pointer}
+  #labels{position:fixed;inset:0;pointer-events:none;overflow:hidden}
+  .lbl{position:absolute;left:0;top:0;transform:translate(-50%,-100%);background:#16213ed9;border:1px solid #2d4a7a;color:#fff;
+       font-size:10.5px;padding:2px 5px;border-radius:4px;white-space:nowrap;pointer-events:auto;cursor:pointer;font-family:monospace}
+  .lbl.sel{background:#ffd54a;color:#16213e;border-color:#ffd54a;font-weight:bold}
+  #legend{position:fixed;right:8px;display:none;background:#16213ee6;border:1px solid #2d4a7a;border-radius:8px;padding:6px 8px;font-size:11px;line-height:1.55}
+  #legend i{display:inline-block;width:16px;height:4px;border-radius:2px;margin-right:6px;vertical-align:middle}
+  @media (max-width:520px){ #top .qmax{display:none} }
+  #load{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#16213e;color:#b2bec3;font-size:14px;z-index:9}
+</style>
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+            "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}
+</script>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="labels"></div>
+<div id="top">
+  <div><h1>Kläranlage Schwierbach · 3D</h1><div class="sub">50.000 EW · Q<sub>TW</sub> 12.000 m³/d<span class="qmax"> · Q<sub>max</sub> 30.000 m³/d</span></div></div>
+  <div class="sp"></div>
+  <button class="btn" id="bHome" title="Gesamtansicht">⌂ Übersicht</button>
+</div>
+<div id="info"><button id="close" aria-label="Schließen">×</button><div id="infoBody"></div></div>
+<div id="legend"></div>
+<div id="bottom">
+  <div id="tour">
+    <button class="btn" id="bPrev" aria-label="Zurück">‹</button>
+    <div id="tname">Rundgang starten ›</div>
+    <button class="btn" id="bNext" aria-label="Weiter">›</button>
+    <button class="btn" id="bAuto">▶ Auto</button>
+  </div>
+  <div id="opts">
+    <button class="btn on" id="bLbl">Beschriftung</button>
+    <button class="btn" id="bFlow">Fließwege</button>
+    <button class="btn" id="bSpeed">Räumer ×100</button>
+  </div>
+</div>
+<div id="load">3D-Modell wird geladen …</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// ------------------------------------------------------------------ Renderer / Szene
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xbcd4e6);
+scene.fog = new THREE.Fog(0xbcd4e6, 380, 950);
+
+const camera = new THREE.PerspectiveCamera(45, 1, 0.5, 2500);
+const controls = new OrbitControls(camera, canvas);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.maxPolarAngle = 1.46;
+controls.minDistance = 12;
+controls.maxDistance = 650;
+controls.screenSpacePanning = false;
+
+scene.add(new THREE.HemisphereLight(0xdcecff, 0x5d6b48, 0.85));
+const sun = new THREE.DirectionalLight(0xfff3e0, 2.1);
+sun.position.set(-140, 220, 110);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -240, right: 240, top: 200, bottom: -200, near: 10, far: 700 });
+sun.shadow.bias = -0.0004;
+sun.shadow.normalBias = 0.6;
+scene.add(sun);
+
+// ------------------------------------------------------------------ Materialien
+const std = (color, o = {}) => new THREE.MeshStandardMaterial({ color, roughness: o.r ?? 0.85, metalness: o.m ?? 0, ...o.x });
+const M = {
+  concrete: std(0xbab6ad), concreteDark: std(0x8f8b84), asphalt: std(0x45474a, { r: 0.95 }),
+  paving: std(0x9a9890, { r: 0.95 }), steel: std(0x8d949b, { r: 0.4, m: 0.6 }), steelDark: std(0x4f565c, { r: 0.5, m: 0.5 }),
+  galv: std(0xb7bcc1, { r: 0.45, m: 0.55 }), grating: std(0x7a8086, { r: 0.6, m: 0.4 }),
+  brick: std(0x98563f), plaster: std(0xe8e3d8), sheet: std(0xc6cacf, { r: 0.55, m: 0.25 }), sheetBlue: std(0x5b7c99, { r: 0.55, m: 0.2 }),
+  roof: std(0x5b5f63, { r: 0.8 }), window: std(0x2a3c4e, { r: 0.15, m: 0.4 }), door: std(0x6b7178, { r: 0.6, m: 0.3 }),
+  gas: std(0xe9c12b, { r: 0.45, m: 0.2 }), pe: std(0xeef0ee, { r: 0.6 }), membrane: std(0xc3c9be, { r: 0.7 }),
+  green: std(0x5e7d68, { r: 0.6, m: 0.2 }), container: std(0x2f6fa8, { r: 0.6, m: 0.3 }), containerG: std(0x4f7a3a, { r: 0.6, m: 0.3 }),
+  rubber: std(0x222222), trunk: std(0x5a4430), fence: new THREE.MeshStandardMaterial({ color: 0x7f8c84, transparent: true, opacity: 0.28, depthWrite: false, side: THREE.DoubleSide })
+};
+const boxGeo = new THREE.BoxGeometry(1, 1, 1);
+const cylGeo = new THREE.CylinderGeometry(0.5, 0.5, 1, 10);
+
+// Wasser-Normalmap (prozedural, kachelbar)
+const waterNormal = (() => {
+  const S = 128, d = new Uint8Array(S * S * 4);
+  const W = [[3, 1, .9, 0], [-2, 3, .7, 1.3], [5, -2, .4, 2.1], [1, -6, .3, .7], [7, 4, .2, 2.9]];
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+    let dx = 0, dy = 0;
+    for (const [kx, ky, a, p] of W) { const c = Math.cos(2 * Math.PI * (kx * x + ky * y) / S + p) * a * 2 * Math.PI / S; dx += c * kx; dy += c * ky; }
+    const n = new THREE.Vector3(-dx * 6, -dy * 6, 1).normalize(), i = (y * S + x) * 4;
+    d[i] = (n.x * .5 + .5) * 255; d[i + 1] = (n.y * .5 + .5) * 255; d[i + 2] = (n.z * .5 + .5) * 255; d[i + 3] = 255;
+  }
+  const t = new THREE.DataTexture(d, S, S); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.needsUpdate = true; return t;
+})();
+const waters = [];
+function waterMat(color, rep = 4, flow = [0.004, 0.003]) {
+  const tex = waterNormal.clone(); tex.repeat.set(rep, rep); tex.needsUpdate = true;
+  const m = new THREE.MeshStandardMaterial({ color, roughness: 0.14, metalness: 0.1, normalMap: tex, normalScale: new THREE.Vector2(0.14, 0.14) });
+  waters.push({ tex, flow }); return m;
+}
+
+// ------------------------------------------------------------------ Hilfsfunktionen
+function box(parent, w, h, d, mat, x, y, z, ry = 0, shadow = true) {
+  const m = new THREE.Mesh(boxGeo, mat); m.scale.set(w, h, d); m.position.set(x, y + h / 2, z); m.rotation.y = ry;
+  m.castShadow = shadow; m.receiveShadow = true; parent.add(m); return m;
+}
+function cyl(parent, rt, rb, h, mat, x, y, z, seg = 32, open = false) {
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, seg, 1, open), mat); m.position.set(x, y + h / 2, z);
+  m.castShadow = true; m.receiveShadow = true; parent.add(m); return m;
+}
+// Instanz-Sammler (Geländer, Fenster, Pfosten …)
+const inst = {};
+function ib(key, geo, mat, x, y, z, sx, sy, sz, ry = 0, cast = true) {
+  (inst[key] ||= { geo, mat, cast, list: [] }).list.push([x, y, z, sx, sy, sz, ry]);
+}
+function flushInst() {
+  const o = new THREE.Object3D();
+  for (const k in inst) {
+    const r = inst[k], im = new THREE.InstancedMesh(r.geo, r.mat, r.list.length);
+    r.list.forEach((p, i) => { o.position.set(p[0], p[1], p[2]); o.scale.set(p[3], p[4], p[5]); o.rotation.set(0, p[6], 0); o.updateMatrix(); im.setMatrixAt(i, o.matrix); });
+    im.castShadow = r.cast; im.receiveShadow = true; scene.add(im);
+  }
+}
+function railing(pts, y, h = 1.1) {
+  for (let i = 0; i < pts.length - 1; i++) {
+    const [x0, z0] = pts[i], [x1, z1] = pts[i + 1], dx = x1 - x0, dz = z1 - z0, L = Math.hypot(dx, dz), ry = -Math.atan2(dz, dx);
+    const mx = (x0 + x1) / 2, mz = (z0 + z1) / 2;
+    ib('rail', boxGeo, M.galv, mx, y + h, mz, L, 0.05, 0.05, ry, false);
+    ib('rail', boxGeo, M.galv, mx, y + h * 0.5, mz, L, 0.04, 0.04, ry, false);
+    const n = Math.max(1, Math.ceil(L / 1.8));
+    for (let k = 0; k <= n; k++) ib('post', boxGeo, M.galv, x0 + dx * k / n, y + h / 2, z0 + dz * k / n, 0.05, h, 0.05, ry, false);
+  }
+}
+const circlePts = (cx, cz, r, n = 48) => Array.from({ length: n + 1 }, (_, i) => [cx + r * Math.cos(i / n * Math.PI * 2), cz + r * Math.sin(i / n * Math.PI * 2)]);
+
+function building(parent, cx, cz, w, d, h, o = {}) {
+  box(parent, w, h, d, o.wall || M.plaster, cx, 0, cz);
+  if (o.gable) {
+    const rh = o.gable, s = new THREE.Shape();
+    s.moveTo(-d / 2 - 0.4, 0); s.lineTo(d / 2 + 0.4, 0); s.lineTo(0, rh); s.closePath();
+    const g = new THREE.ExtrudeGeometry(s, { depth: w + 0.6, bevelEnabled: false });
+    g.rotateY(Math.PI / 2); g.translate(-(w + 0.6) / 2, 0, 0);
+    const m = new THREE.Mesh(g, o.roof || M.roof); m.position.set(cx, h, cz); m.castShadow = m.receiveShadow = true; parent.add(m);
+  } else {
+    box(parent, w + 0.3, 0.45, d + 0.3, o.roof || M.roof, cx, h, cz);
+  }
+  const floors = o.floors || 1, fh = h / floors;
+  if (o.win !== false) for (let f = 0; f < floors; f++) {
+    const wy = f * fh + fh * 0.42, wh = o.band ? fh * 0.38 : 1.2;
+    for (const side of [1, -1]) {
+      if (o.band) ib('win', boxGeo, M.window, cx, wy, cz + side * (d / 2 + 0.03), w - 3, wh, 0.08, 0, false);
+      else for (let x = cx - w / 2 + 2; x <= cx + w / 2 - 2; x += o.winStep || 3.2)
+        ib('win', boxGeo, M.window, x, wy, cz + side * (d / 2 + 0.03), 1.5, wh, 0.08, 0, false);
+    }
+  }
+  for (const dr of (o.doors || [])) { // {s:'s'|'n'|'e'|'w', off, w, h}
+    const W = dr.w || 1.2, H = dr.h || 2.2;
+    if (dr.s === 's' || dr.s === 'n') ib('door', boxGeo, M.door, cx + (dr.off || 0), H / 2, cz + (dr.s === 's' ? 1 : -1) * (d / 2 + 0.05), W, H, 0.1, 0, false);
+    else ib('door', boxGeo, M.door, cx + (dr.s === 'e' ? 1 : -1) * (w / 2 + 0.05), H / 2, cz + (dr.off || 0), 0.1, H, W, 0, false);
+  }
+}
+
+// ------------------------------------------------------------------ Komponenten-Registry
+const comps = {}; const pickables = [];
+function reg(id, group, info) {
+  scene.add(group); group.updateMatrixWorld(true);
+  const b = new THREE.Box3().setFromObject(group), c = b.getCenter(new THREE.Vector3()), s = b.getSize(new THREE.Vector3());
+  group.traverse(o => { if (o.isMesh) { o.userData.comp = id; pickables.push(o); } });
+  comps[id] = { id, group, ...info, center: new THREE.Vector3(c.x, 0, c.z), anchor: info.anchor || new THREE.Vector3(c.x, b.max.y + 1.5, c.z), radius: Math.max(s.x, s.z) / 2 };
+}
+const anims = [];
+
+// Rundbecken (VK, NK, Voreindicker)
+function roundTank(cx, cz, r, o) {
+  const g = new THREE.Group(); g.position.set(cx, 0, cz);
+  const top = o.wallH ?? 1.0, wl = top - 0.25, V2 = THREE.Vector2;
+  const wall = new THREE.Mesh(new THREE.LatheGeometry([new V2(r, -1), new V2(r + 0.4, -1), new V2(r + 0.4, top), new V2(r, top), new V2(r, -1)], 80), M.concrete);
+  wall.castShadow = wall.receiveShadow = true; g.add(wall);
+  const water = new THREE.Mesh(new THREE.CircleGeometry(r, 80).rotateX(-Math.PI / 2), waterMat(o.water, r / 7));
+  water.position.y = wl; water.receiveShadow = true; g.add(water);
+  if (o.rinne) {
+    const ri = new THREE.Mesh(new THREE.LatheGeometry([new V2(r - 1.3, wl - .5), new V2(r - 1.1, wl - .5), new V2(r - 1.1, wl + .1), new V2(r - 1.3, wl + .1), new V2(r - 1.3, wl - .5)], 80), M.concreteDark);
+    g.add(ri);
+  }
+  if (o.tauch) { const t = new THREE.Mesh(new THREE.CylinderGeometry(r - (o.rinne ? 2.4 : 1.2), r - (o.rinne ? 2.4 : 1.2), 0.7, 80, 1, true), new THREE.MeshStandardMaterial({ color: 0x59626a, metalness: .4, roughness: .5, side: THREE.DoubleSide })); t.position.y = wl; g.add(t); }
+  cyl(g, 1.4, 1.4, top + 1.6, M.concrete, 0, -1, 0);
+  if (o.inlet) { const e = new THREE.Mesh(new THREE.CylinderGeometry(2.8, 2.8, 1.3, 40, 1, true), new THREE.MeshStandardMaterial({ color: 0x6d757c, metalness: .4, roughness: .5, side: THREE.DoubleSide })); e.position.y = wl - 0.2; g.add(e); }
+  // Räumerbrücke
+  const br = new THREE.Group(); g.add(br);
+  const by = top + 0.75, x0 = o.full ? -r - 0.3 : 0, x1 = r + 0.3, L = x1 - x0;
+  box(br, L, 0.5, 1.4, M.steel, (x0 + x1) / 2, by - 0.5, 0);
+  box(br, L, 0.06, 1.3, M.grating, (x0 + x1) / 2, by, 0);
+  for (const zs of [0.65, -0.65]) {
+    box(br, L, 0.05, 0.05, M.galv, (x0 + x1) / 2, by + 1.1, zs, 0, false);
+    box(br, L, 0.04, 0.04, M.galv, (x0 + x1) / 2, by + 0.55, zs, 0, false);
+    for (let x = x0; x <= x1 + 0.01; x += L / Math.ceil(L / 2)) box(br, 0.05, 1.1, 0.05, M.galv, x, by, zs, 0, false);
+  }
+  box(br, 2.2, 1.1, 2.0, M.steelDark, 0, top + 0.4, 0); // Mittelantrieb / Drehlager
+  if (!o.full) {
+    box(br, 1.6, 1.3, 2.0, M.steelDark, r + 0.2, top, 0);           // Fahrwerk
+    box(br, 0.8, 0.6, 0.6, M.green, r + 0.2, top + 1.3, 0.5);       // Fahrantrieb
+    box(br, r - 3.5, 0.18, 0.08, M.steelDark, r / 2 + 1.2, wl + 0.02, 0.9, 0.04, false); // Schwimmschlammschild
+    for (let x = 3; x < r - 1; x += 3) box(br, 0.12, by - wl - 0.4, 0.12, M.steelDark, x, wl - 0.1, -0.5, 0, false); // Räumschild-Gestänge
+  } else {
+    box(br, 1.2, 1.2, 1.2, M.green, 0, top + 1.5, 0);
+    for (let a = 0; a < 4; a++) { const rod = box(br, 0.1, 1.2, 0.1, M.steelDark, Math.cos(a * Math.PI / 2) * 0.9, wl - 0.6, Math.sin(a * Math.PI / 2) * 0.9, 0, false); }
+  }
+  if (o.omega !== 0) anims.push({ type: 'rot', obj: br, omega: o.omega ?? 0.02 / r });
+  return g;
+}
+
+// ------------------------------------------------------------------ Gelände, Bach
+const creekX = z => 170 + 8 * Math.sin(z / 23) + 4 * Math.sin(z / 9 + 1);
+const FENCE = { x0: -140, x1: 148, z0: -95, z1: 95 };
+const CP = []; for (let z = -260; z <= 260; z += 2) CP.push([creekX(z), z]);
+function creekDist(x, z) {
+  if (Math.abs(x - 170) > 30) return 99;
+  const i = Math.round((z + 260) / 2); let d = 99;
+  for (let k = Math.max(0, i - 7); k <= Math.min(CP.length - 1, i + 7); k++) d = Math.min(d, Math.hypot(x - CP[k][0], z - CP[k][1]));
+  return d;
+}
+const sstep = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+{
+  const W = 620, D = 520, g = new THREE.PlaneGeometry(W, D, 310, 260).rotateX(-Math.PI / 2);
+  g.translate(10, 0, 0);
+  const p = g.attributes.position, col = new Float32Array(p.count * 3), c = new THREE.Color();
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i), z = p.getZ(i);
+    const out = Math.max(FENCE.x0 - x, x - FENCE.x1, FENCE.z0 - z, z - FENCE.z1, 0);
+    let y = 0.5 * (Math.sin(x * 0.031) + Math.sin(z * 0.026 + 1.2)) * sstep(0, 40, out);
+    const d = creekDist(x, z), s = sstep(1.5, 6.5, d);
+    y = y * s + (-1.8) * (1 - s);
+    p.setY(i, y);
+    const n = 0.5 + 0.5 * Math.sin(x * 0.13 + Math.sin(z * 0.07) * 2) * Math.sin(z * 0.11);
+    if (out === 0) c.setRGB(0.42 + n * 0.04, 0.58 + n * 0.04, 0.30);
+    else if (x < -170 && Math.abs(z - 60) > 6) c.setHSL(((Math.floor((z + 300) / 45)) % 2) ? 0.17 : 0.24, 0.42, 0.40 + n * 0.06); // Feldflur
+    else c.setRGB(0.36 + n * 0.05, 0.52 + n * 0.05, 0.27);
+    if (d < 7) c.lerp(new THREE.Color(0.30, 0.42, 0.24), 1 - sstep(3, 7, d));
+    if (d < 3.6) c.setRGB(0.32, 0.30, 0.24);
+    col.set([c.r, c.g, c.b], i * 3);
+  }
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3)); g.computeVertexNormals();
+  const ground = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 }));
+  ground.receiveShadow = true; scene.add(ground);
+
+  // Bach-Wasserband
+  const pos = [], uv = [], idx = []; let s = 0;
+  for (let i = 0; i < CP.length; i++) {
+    const a = CP[Math.max(0, i - 1)], b = CP[Math.min(CP.length - 1, i + 1)];
+    let tx = b[0] - a[0], tz = b[1] - a[1]; const l = Math.hypot(tx, tz); tx /= l; tz /= l;
+    const nx = -tz, nz = tx, hw = 4.2; if (i) s += Math.hypot(CP[i][0] - CP[i - 1][0], CP[i][1] - CP[i - 1][1]);
+    pos.push(CP[i][0] + nx * hw, -1.1, CP[i][1] + nz * hw, CP[i][0] - nx * hw, -1.1, CP[i][1] - nz * hw);
+    uv.push(0, s / 9, 1, s / 9);
+    if (i) { const k = i * 2; idx.push(k - 2, k - 1, k, k - 1, k + 1, k); }
+  }
+  const cg = new THREE.BufferGeometry(); cg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  cg.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); cg.setIndex(idx); cg.computeVertexNormals();
+  const cm = waterMat(0x4d6e66, 1, [0, -0.08]); cm.side = THREE.DoubleSide;
+  const creek = new THREE.Mesh(cg, cm); creek.receiveShadow = true;
+  const gC = new THREE.Group(); gC.add(creek);
+  reg('bach', gC, { name: 'Schwierbach (Vorfluter)', kks: 'Gewässer', anchor: new THREE.Vector3(creekX(-120), 2, -120),
+    text: 'Vorfluter der Kläranlage. Aufnahme des gereinigten Abwassers über den Ablaufmessschacht sowie – bei Überschreitung der Abschlagschwelle – des nur mechanisch gereinigten Mischwassers über SV-201.',
+    rows: [['Einleitung', 'Ablauf NK (gereinigt)'], ['Abschlag', 'SV-201, nur mech. gereinigt'], ['Fließrichtung', 'Nord → Süd']] });
+}
+
+// Straßen, Flächen
+const roads = [[-133, 142, -88, -82], [-133, -127, -88, 63], [-280, 142, 57, 63], [136, 142, -88, 63], [-133, 142, 8, 14],
+  [-124, -100, 22, 50], [-20, 12, 66, 88], [44, 112, 22, 34]];
+for (const [x0, x1, z0, z1] of roads) box(scene, x1 - x0, 0.05, z1 - z0, M.asphalt, (x0 + x1) / 2, 0, (z0 + z1) / 2, 0, false);
+for (let x = -122; x <= -102; x += 2.8) for (const z of [22.2, 49.8]) ib('mark', boxGeo, std(0xeeeeee), x, 0.06, z + (z > 30 ? -2.6 : 2.6), 0.12, 0.02, 5, 0, false);
+
+// Zaun
+{
+  const { x0, x1, z0, z1 } = FENCE, sides = [[x0, z0, x1, z0], [x1, z0, x1, z1], [x1, z1, x0, z1], [x0, z1, x0, 66], [x0, 54, x0, z0]];
+  for (const [a, b, c, d] of sides) {
+    const L = Math.hypot(c - a, d - b), ry = -Math.atan2(d - b, c - a);
+    const p = new THREE.Mesh(new THREE.PlaneGeometry(L, 2), M.fence); p.position.set((a + c) / 2, 1, (b + d) / 2); p.rotation.y = ry; scene.add(p);
+    for (let k = 0; k <= Math.ceil(L / 3); k++) { const t = k / Math.ceil(L / 3); ib('fpost', cylGeo, M.galv, a + (c - a) * t, 1.05, b + (d - b) * t, 0.08, 2.1, 0.08, 0, false); }
+  }
+}
+
+// ------------------------------------------------------------------ MECHANISCHE REINIGUNG
+// Zulaufpumpwerk / Hebewerk
+{
+  const g = new THREE.Group();
+  building(g, -118, -40, 12, 10, 6, { wall: M.brick, doors: [{ s: 's', w: 3, h: 3.5 }] });
+  box(g, 6, 0.6, 4, M.concrete, -118, 0, -48.5);                     // Nassschacht
+  for (const x of [-132, -142, -152]) cyl(g, 0.4, 0.4, 0.08, M.steelDark, x, 0, -40, 20); // Schachtdeckel Kanal
+  reg('zpw', g, { name: 'Zulaufpumpwerk (Hebewerk)', kks: 'P1.1 / P1.2 · FI 101 · LI 103 · QI 102',
+    text: 'Hebt das im Freigefälle ankommende Abwasser aus dem Kanalnetz auf das Niveau der mechanischen Reinigung. Trübwasser und Zentrat der Schlammbehandlung werden hier zurückgeführt.',
+    rows: [['Pumpen', '2 × Tauchmotorpumpe (KP), 1 Betrieb + 1 Reserve, FU'], ['Messung', 'FI 101 Durchfluss (MID), LI 103 Füllstand Pumpensumpf, QI 102 Spektralsonde CSB/AFS'], ['Bemessung', 'Q_TW 12.000 m³/d · Q_max 30.000 m³/d']] });
+}
+// Rechengebäude
+{
+  const g = new THREE.Group();
+  building(g, -96, -40, 16, 11, 7.5, { wall: M.brick, doors: [{ s: 's', off: 3, w: 4, h: 4 }, { s: 'n', off: -5 }] });
+  box(g, 6.5, 1.6, 2.5, M.container, -93, 0, -31.5);
+  box(g, 8, 0.6, 1.6, M.concreteDark, -108, 0, -40); // Gerinne
+  reg('rechen', g, { name: 'Rechengebäude', kks: 'R1.1 / WP1.1',
+    text: 'Entfernung von Grobstoffen (Hygieneartikel, Textilien, Holz) vor dem Sandfang. Das Rechengut wird gewaschen, entwässert und im Container gesammelt.',
+    rows: [['Rechen', 'Siebrechenanlage (Treppen-/Bürstenrechen)'], ['Rechengut', 'Waschpresse WP1.1 mit Förderschnecke → Container']] });
+}
+// Sand- und Fettfang
+{
+  const g = new THREE.Group(), x0 = -84, x1 = -56, z0 = -45.5, z1 = -34.5, top = 0.8, wl = 0.55, t = 0.4;
+  for (const z of [z0, z1]) box(g, x1 - x0 + t, top + 1, t, M.concrete, (x0 + x1) / 2, -1, z);
+  for (const x of [x0, x1]) box(g, t, top + 1, z1 - z0, M.concrete, x, -1, (z0 + z1) / 2);
+  box(g, x1 - x0, top + 1, t, M.concrete, (x0 + x1) / 2, -1, -40);
+  const sand = waterMat(0x7b705a, 3), fett = waterMat(0x8d8467, 2);
+  for (const [za, zb, m] of [[-45.3, -44, fett], [-44, -40.2, sand], [-39.8, -36, sand], [-36, -34.7, fett]]) {
+    const w = new THREE.Mesh(new THREE.PlaneGeometry(x1 - x0 - 0.4, zb - za).rotateX(-Math.PI / 2), m); w.position.set((x0 + x1) / 2, wl, (za + zb) / 2); w.receiveShadow = true; g.add(w);
+  }
+  for (const z of [-44, -36]) box(g, x1 - x0 - 0.4, 0.5, 0.06, M.steelDark, (x0 + x1) / 2, wl - 0.25, z, 0, false); // Trennwand Fettfang
+  const br = new THREE.Group(); g.add(br);
+  box(br, 1.5, 0.5, z1 - z0 + 1, M.steel, 0, top + 0.4, (z0 + z1) / 2);
+  box(br, 1.4, 0.06, z1 - z0 + 0.6, M.grating, 0, top + 0.9, (z0 + z1) / 2);
+  for (const z of [z0, z1]) box(br, 1.8, 1.0, 1.2, M.steelDark, 0, top, z);
+  for (const z of [-42, -38]) cyl(br, 0.15, 0.15, top + 0.6, M.steelDark, 0.4, wl - 0.2, z, 10);
+  box(br, 0.8, 0.7, 0.7, M.green, 0, top + 1.0, -40);
+  anims.push({ type: 'shuttle', obj: br, a: x0 + 2, b: x1 - 2, v: 0.025 });
+  building(g, -61, -52, 4, 3.2, 3, { wall: M.sheet, win: false, doors: [{ s: 'n' }] });  // Sandfanggebläse
+  const kl = cyl(g, 0.4, 0.4, 5.5, M.steelDark, -51.5, 0.3, -47, 16); kl.rotation.z = -1.1; kl.position.y = 1.6;
+  box(g, 3, 1.4, 2, M.containerG, -49, 0, -50.5);
+  box(g, 5, 0.8, 5, M.concrete, -46, 0, -40); // Verteilerbauwerk
+  reg('sandfang', g, { name: 'Belüfteter Sand- und Fettfang', kks: 'G2.1 / SK2.1 · FI 104',
+    text: 'Langsandfang mit zwei Straßen. Durch die seitliche Belüftung entsteht eine Walzenströmung: mineralische Stoffe setzen sich ab, Fette und Öle werden in der beruhigten Fettfangkammer abgeschieden.',
+    rows: [['Bauform', 'Langsandfang, 2 Straßen, je mit Fettfang'], ['Belüftung', 'Sandfanggebläse G2.1, FI 104 Luftmenge'], ['Räumung', 'Längsräumerbrücke mit Sandabsaugung'], ['Sandfanggut', 'Sandklassierer SK2.1 → Container']] });
+}
+// Vorklärung
+{
+  const g = new THREE.Group();
+  g.add(roundTank(-28, -58, 9, { water: 0x6e6852, rinne: true, tauch: true, wallH: 0.9 }));
+  g.add(roundTank(-28, -22, 9, { water: 0x6e6852, rinne: true, tauch: true, wallH: 0.9 }));
+  reg('vk', g, { name: 'Vorklärung VK1 + VK2', kks: 'P6.1 · QI 105 · HS-202',
+    text: 'Absetzbecken zur Abscheidung absetzbarer organischer Stoffe. Der Primärschlamm wird vom Schildräumer in den Schlammtrichter geschoben und über P6.1 zum Voreindicker gefördert.',
+    rows: [['Bauform', '2 Rundbecken, Halbbrückenräumer'], ['Durchmesser', '≈ 18 m *'], ['Primärschlamm', 'P6.1 Exzenterschneckenpumpe, drehzahlgeregelt'], ['Messung', 'QI 105 Trübung/AFS Ablauf VK']], note: true });
+}
+// Mischwasserabschlag
+{
+  const g = new THREE.Group();
+  box(g, 6, 1.0, 4, M.concrete, -14, 0, -74);
+  box(g, 1.2, 1.2, 0.8, M.green, -15.5, 1.0, -74);
+  for (const x of [-16, -12]) cyl(g, 0.35, 0.35, 0.06, M.steelDark, x, 1.0, -73, 16);
+  reg('abschlag', g, { name: 'Mischwasserabschlag', kks: 'SV-201 Regelklappe (motorisch)',
+    text: 'Überschreitet der Gesamtzulauf die Abschlagschwelle, wird der Überschuss nach mechanischer Reinigung (Rechen + Vorklärung) direkt in den Schwierbach abgeschlagen – nur teilgereinigt.',
+    rows: [['Armatur', 'SV-201 Regelklappe, motorisch'], ['Messung', '503 Abschlagqualität'], ['Ziel', 'Schutz der Biologie vor hydraulischer Überlast']] });
+}
+
+// ------------------------------------------------------------------ BIOLOGIE
+const bubbles = [];
+{
+  const g = new THREE.Group(), x0 = 0, x1 = 56, top = 1.0, wl = 0.75, t = 0.45, xd = 22.4;
+  const lanes = [[-62, -42], [-38, -18]];
+  for (const z of [-62, -42, -38, -18]) box(g, x1 - x0 + t, top + 1, t, M.concrete, (x0 + x1) / 2, -1, z);
+  for (const x of [x0, x1]) for (const [za, zb] of lanes) box(g, t, top + 1, zb - za, M.concrete, x, -1, (za + zb) / 2);
+  box(g, x1 - x0, 0.08, 4, M.grating, (x0 + x1) / 2, top, -40);   // Rohrgalerie / Laufsteg
+  railing([[x0, -41.8], [x1, -41.8]], top + 0.08); railing([[x0, -38.2], [x1, -38.2]], top + 0.08);
+  const deni = waterMat(0x5a432e, 5), nitri = waterMat(0x7a5b3b, 6, [0.012, 0.009]);
+  for (const [za, zb] of lanes) {
+    const zc = (za + zb) / 2, dz = zb - za - t;
+    const wd = new THREE.Mesh(new THREE.PlaneGeometry(xd - x0 - t, dz).rotateX(-Math.PI / 2), deni); wd.position.set((x0 + xd) / 2, wl, zc); wd.receiveShadow = true; g.add(wd);
+    const wn = new THREE.Mesh(new THREE.PlaneGeometry(x1 - xd - t, dz).rotateX(-Math.PI / 2), nitri); wn.position.set((xd + x1) / 2, wl, zc); wn.receiveShadow = true; g.add(wn);
+    box(g, 0.3, top + 0.8, dz, M.concrete, xd, -1, zc);                              // Trennwand Deni/Nitri
+    box(g, 1.2, 0.08, dz, M.grating, xd, top + 0.15, zc); railing([[xd - 0.6, za + 0.3], [xd - 0.6, zb - 0.3]], top + 0.2); railing([[xd + 0.6, za + 0.3], [xd + 0.6, zb - 0.3]], top + 0.2);
+    // Rührwerks-Hebevorrichtungen (Deni)
+    const zw = za === -62 ? za + 0.3 : zb - 0.3, sg = za === -62 ? 1 : -1;
+    for (const x of [6, 15]) { box(g, 0.2, 2.4, 0.2, M.galv, x, top, zw); box(g, 0.15, 0.15, 1.6, M.galv, x, top + 2.3, zw + sg * 0.8); box(g, 0.05, 2.0, 0.05, M.steelDark, x, wl + 0.4, zw + sg * 1.5, 0, false); }
+    // Belüftungs-Fallleitungen von der Galerie
+    const ze = za === -62 ? -42.5 : -37.5;
+    for (let x = 25; x < 55; x += 3) { box(g, 0.14, 1.2, 0.14, M.steel, x, wl - 0.3, ze, 0, false); }
+    // Belüftungs-"Blasenfelder"
+    for (let x = xd + 1.2; x < x1 - 0.8; x += 1.35) for (let z = za + 1.0; z < zb - 0.8; z += 1.35)
+      bubbles.push([x + (Math.random() - .5) * .8, wl + 0.02, z + (Math.random() - .5) * .8, Math.random() * 6.28, 1.5 + Math.random() * 2.5]);
+  }
+  { const h = cyl(g, 0.3, 0.3, x1 - 23, M.steel, (23 + x1) / 2, 0, -40); h.rotation.z = Math.PI / 2; h.position.y = top + 0.8; } // Luftsammelleitung
+  const lp = cyl(g, 0.3, 0.3, 22, M.steel, xd, top + 0.5, -29); lp.rotation.x = Math.PI / 2; lp.position.y = top + 0.8;
+  reg('bb', g, { name: 'Belebungsbecken', kks: 'Rw1.1 · P4.1 · QI 301',
+    text: 'Biologische Stufe mit vorgeschalteter Denitrifikation (anoxisch, gerührt) und Nitrifikation (aerob, feinblasig belüftet). Die interne Rezirkulation P4.1 führt nitrathaltiges Wasser aus der Nitrifikation in die Denitrifikation zurück.',
+    rows: [['Volumen', '10.000 m³, 2 Straßen'], ['Verfahren', 'vorgeschaltete Denitrifikation, V_D/V_BB = 0,40'], ['Belüftung', 'Membranbelüfter, O₂-Sonde QI 301'], ['Regelung', 'Kaskade NH₄ → O₂ → Luftmenge → Gebläse'], ['Rührwerke', 'Rw1.1 Tauchmotorrührwerke, ~4 kW'], ['Rezirkulation', 'P4.1 Axialpumpe, ~2 × Q_ZU, FU']] });
+}
+// Blaseninstanzen
+const bubbleMesh = new THREE.InstancedMesh(new THREE.CircleGeometry(0.32, 10).rotateX(-Math.PI / 2),
+  new THREE.MeshBasicMaterial({ color: 0xefe6d2, transparent: true, opacity: 0.38, depthWrite: false }), bubbles.length);
+scene.add(bubbleMesh);
+
+// Gebläsestation
+{
+  const g = new THREE.Group();
+  building(g, 28, -4, 16, 9, 5, { wall: M.sheet, win: false, doors: [{ s: 's', off: -4, w: 3, h: 3.2 }, { s: 's', off: 4 }] });
+  for (let x = 22; x <= 34; x += 3) ib('win', boxGeo, M.steelDark, x, 3.2, -8.55, 2.2, 1.2, 0.1, 0, false); // Zuluftjalousien
+  box(g, 0.6, 0.6, 10, M.steel, 22.4, 1.3, -13.5, 0, true);
+  reg('geblaese', g, { name: 'Gebläsestation', kks: 'G1.1 / G1.2 · FIC 201',
+    text: 'Erzeugung der Prozessluft für die Nitrifikation. Die Luftmenge wird über die Sauerstoffregelung (Kaskade) vorgegeben und über die Gebläsedrehzahl eingestellt.',
+    rows: [['Aggregate', '2 × Drehkolbengebläse (Aerzen), 1 Betrieb + 1 Reserve'], ['Antrieb', 'FU-geregelt'], ['Messung', 'FIC 201 Luftmenge']] });
+}
+// Fällmittelstation
+{
+  const g = new THREE.Group();
+  for (const [x, z, w, d] of [[62, -7, 7, .3], [62, -1, 7, .3], [58.65, -4, .3, 6], [65.35, -4, .3, 6]]) box(g, w, 1.0, d, M.concrete, x, 0, z);
+  box(g, 6.6, 0.1, 5.6, M.concreteDark, 62, 0, -4);
+  cyl(g, 1.6, 1.6, 6.2, M.pe, 61.5, 0.1, -4, 32); cyl(g, 1.6, 1.4, 0.4, M.pe, 61.5, 6.3, -4, 32);
+  box(g, 1.6, 2, 1.0, M.sheetBlue, 64.2, 0.1, -2);
+  reg('fecl3', g, { name: 'Fällmittelstation', kks: 'P7.1 · 701 / 702',
+    text: 'Lagerung und Dosierung des Fällmittels für die Simultanfällung des Phosphors. Lagertank in Auffangwanne, Dosierung in den Ablauf der Belebung.',
+    rows: [['Fällmittel', 'FeCl₃ 40 %'], ['Dosierpumpe', 'P7.1 ProMinent Sigma S2Cb (Kolbenmembranpumpe)'], ['Verfahren', 'Simultanfällung']] });
+}
+
+// ------------------------------------------------------------------ NACHKLÄRUNG, RS, ABLAUF
+{
+  const g = new THREE.Group();
+  g.add(roundTank(102, -62, 16, { water: 0x36574f, rinne: true, tauch: true, inlet: true }));
+  g.add(roundTank(102, -18, 16, { water: 0x36574f, rinne: true, tauch: true, inlet: true }));
+  reg('nk', g, { name: 'Nachklärung NK1 + NK2', kks: 'LI 401 · V-402',
+    text: 'Trennung von belebtem Schlamm und gereinigtem Abwasser. Der Zulauf erfolgt zentral über das Einlaufbauwerk, das Klarwasser läuft über die Zahnschwellen in die Ablaufrinne.',
+    rows: [['Bauform', '2 Rundbecken, Halbbrückenräumer, zentraler Einlauf'], ['Durchmesser', '≈ 32 m *'], ['Messung', 'LI 401 Schlammspiegel']], note: true });
+}
+{
+  const g = new THREE.Group();
+  building(g, 72, -40, 10, 9, 4.5, { wall: M.brick, doors: [{ s: 'e', w: 3, h: 3 }] });
+  reg('rs', g, { name: 'Rücklaufschlammpumpwerk', kks: 'P3.1–P3.6 · P5.1 · FI 402',
+    text: 'Rückführung des in der Nachklärung abgesetzten Schlamms in die Belebung (Stufenschaltung nach RS-Sollwert). Der Überschussschlamm wird abgezweigt und zum Voreindicker gefördert.',
+    rows: [['RS-Pumpen', '6 × KSB Sewabloc F 100-252 (5 + 1 Reserve)'], ['Betriebspunkt', 'je ~80 m³/h bei ~12 m'], ['Messung', 'FI 402 Rücklaufschlamm gesamt'], ['ÜS-Pumpe', 'P5.1 Seepex BN 52-6L, drehzahlgeregelt, ~250 m³/d']] });
+}
+{
+  const g = new THREE.Group();
+  box(g, 3.5, 0.8, 3.5, M.concrete, 128, 0, -40);
+  building(g, 128, -34.5, 3.2, 2.6, 2.8, { win: false, doors: [{ s: 's' }] });
+  const ax = creekX(-40) - 6.2;
+  box(g, 1.2, 2.2, 5, M.concrete, ax, -1.6, -40);
+  reg('ablauf', g, { name: 'Ablaufmessschacht', kks: '501 · 502 · 504',
+    text: 'Messung und Probenahme des gereinigten Abwassers vor der Einleitung in den Schwierbach (Größenklasse 4).',
+    rows: [['Messung', 'Durchfluss, online CSB / NH₄ / P'], ['Probenahme', 'automatischer Probenehmer'], ['Einleitung', 'Auslaufbauwerk Schwierbach']] });
+}
+
+// ------------------------------------------------------------------ SCHLAMMBEHANDLUNG
+{
+  const g = new THREE.Group();
+  g.add(roundTank(-25, 40, 6, { water: 0x4c4234, full: true, omega: 0.012, wallH: 1.2 }));
+  building(g, -8, 40, 14, 10, 6, { wall: M.brick, doors: [{ s: 's', w: 3, h: 3.2 }, { s: 'w', off: 2 }] });
+  reg('ve', g, { name: 'Voreindicker VE-1 + Gerätehaus', kks: 'VE-1 · P6.2 · FI 613',
+    text: 'Statische Eindickung von Primär- und Überschussschlamm. Der Dickschlamm wird von der Dickschlammpumpe P6.2 im Gerätehaus zum Faulturm gefördert, das Trübwasser läuft zum Hebewerk zurück.',
+    rows: [['Eindicker', 'Rundbecken, statisch, Krählwerk, Sohle 361,00 m NN'], ['Gerätehaus', 'FFB 361,00 m NN'], ['Dickschlammpumpe', 'P6.2 Sulzer PC (ESP), FU'], ['Messung', 'FI 613 Förderstrom Dickschlamm']] });
+}
+// Faulturm (Faulei)
+{
+  const g = new THREE.Group(), cx = 28, cz = 45, R = 7.8, H = 26, sunk = 4;
+  const cv = document.createElement('canvas'); cv.width = 64; cv.height = 8; const cx2 = cv.getContext('2d');
+  cx2.fillStyle = '#c9cdd1'; cx2.fillRect(0, 0, 64, 8); cx2.fillStyle = '#a9aeb3'; for (let i = 0; i < 64; i += 8) cx2.fillRect(i, 0, 3, 8);
+  const tex = new THREE.CanvasTexture(cv); tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(70, 1); tex.colorSpace = THREE.SRGBColorSpace;
+  const pts = []; let yTop = 0;
+  for (let i = 0; i <= 60; i++) {
+    const th = i / 60 * Math.PI, r = R * Math.pow(Math.sin(th), 0.85), y = -sunk + H / 2 * (1 - Math.cos(th));
+    if (i > 30 && r < 2.2) { yTop = y; pts.push(new THREE.Vector2(2.2, y), new THREE.Vector2(0, y)); break; }
+    pts.push(new THREE.Vector2(Math.max(r, 0.01), y));
+  }
+  const egg = new THREE.Mesh(new THREE.LatheGeometry(pts, 64), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.45, metalness: 0.45 }));
+  egg.position.set(cx, 0, cz); egg.castShadow = egg.receiveShadow = true; g.add(egg);
+  cyl(g, 6.3, 6.5, 0.8, M.concrete, cx, 0, cz, 48);
+  cyl(g, 1.5, 1.5, 1.6, M.steel, cx, yTop, cz, 24);                        // Gasdom
+  cyl(g, 4.6, 4.6, 0.15, M.grating, cx, yTop - 0.2, cz, 40);               // Bühne
+  railing(circlePts(cx, cz, 4.5, 36), yTop - 0.05);
+  // Treppenturm
+  const tx = cx + R + 3.2;
+  for (const [dx, dz] of [[-1.5, -1.5], [1.5, -1.5], [1.5, 1.5], [-1.5, 1.5]]) box(g, 0.2, yTop, 0.2, M.steelDark, tx + dx, 0, cz + dz);
+  for (let y = 3; y < yTop; y += 3) { box(g, 3.2, 0.12, 3.2, M.grating, tx, y, cz); railing([[tx - 1.6, cz - 1.6], [tx + 1.6, cz - 1.6], [tx + 1.6, cz + 1.6], [tx - 1.6, cz + 1.6], [tx - 1.6, cz - 1.6]], y + 0.12, 1.0); }
+  box(g, (tx - 1.5) - (cx + 4.4), 0.12, 1.2, M.grating, (tx - 1.5 + cx + 4.4) / 2, yTop - 0.2, cz);
+  // Gasleitung (gelb) Turm → Gasspeicher/BHKW/Fackel
+  const gp = (x, y, z, L, ax) => { const m = cyl(g, 0.22, 0.22, L, M.gas, x, y, z, 12); if (ax === 'x') { m.rotation.z = Math.PI / 2; m.position.y = y; } if (ax === 'z') { m.rotation.x = Math.PI / 2; m.position.y = y; } };
+  gp(tx + 1.8, 0, cz, yTop + 1.2);
+  gp(tx + 1.8 + 5.1, 3, cz, 10.2, 'x');
+  gp(cx + R + 15, 3, cz + 6.5, 13, 'z');
+  // Maschinenhaus Faulung
+  building(g, 28, 58.5, 11, 6, 4.5, { wall: M.brick, doors: [{ s: 'e', w: 2.5, h: 3 }] });
+  reg('ft', g, { name: 'Faulturm FT-1', kks: 'P10.1 / P10.2 · W10.1 · FI 608',
+    text: 'Anaerobe Stabilisierung des Dickschlamms bei 37 °C. Der Faulturminhalt wird über die Umwälzpumpen und den Schlammwärmetauscher umgewälzt und beheizt; das entstehende Faulgas wird gespeichert und im BHKW verwertet.',
+    rows: [['Volumen', '2.200 m³'], ['Betrieb', 'mesophil, 37 °C'], ['Umwälzung', 'P10.1/P10.2 KSB Sewabloc F 100-254 (Betrieb/Reserve)'], ['Beheizung', 'W10.1 Rohr-in-Rohr-WT, Heizwasser BHKW'], ['Messung', 'FI 608 Faulgas']], note: true });
+}
+// Gasspeicher
+{
+  const g = new THREE.Group(), cx = 70, cz = 58;
+  cyl(g, 8.4, 8.4, 0.7, M.concrete, cx, 0, cz, 48);
+  const d = new THREE.Mesh(new THREE.SphereGeometry(8, 48, 18, 0, Math.PI * 2, 0, Math.PI / 2), M.membrane);
+  d.scale.y = 0.75; d.position.set(cx, 0.7, cz); d.castShadow = d.receiveShadow = true; g.add(d);
+  box(g, 1.6, 1.2, 1.0, M.green, cx - 9.5, 0, cz + 3);
+  for (let a = 0; a < 16; a++) ib('anchor', boxGeo, M.steelDark, cx + Math.cos(a / 16 * 6.283) * 8.3, 0.8, cz + Math.sin(a / 16 * 6.283) * 8.3, 0.3, 0.2, 0.3, 0, false);
+  reg('gs', g, { name: 'Gasspeicher GS-1', kks: 'GS-1 · 609',
+    text: 'Zwischenspeicherung des Faulgases zum Ausgleich zwischen Gasproduktion und Gasverbrauch im BHKW. Die Außenmembran wird vom Stützluftgebläse in Form gehalten.',
+    rows: [['Bauart', 'Doppelmembranspeicher'], ['Zubehör', 'Stützluftgebläse, Füllstandsmessung']] });
+}
+// BHKW
+{
+  const g = new THREE.Group();
+  box(g, 12, 3.6, 3.6, M.green, 58, 0, 28);
+  box(g, 3.2, 1.2, 2.4, M.steelDark, 54, 3.6, 28);
+  for (const x of [53.2, 54.8]) cyl(g, 0.55, 0.55, 0.08, M.rubber, x, 4.8, 28, 20);
+  cyl(g, 0.3, 0.3, 9.5, M.steel, 63, 0, 26.8, 16);
+  box(g, 2, 2, 1.4, M.sheetBlue, 66, 0, 28);
+  for (let x = 54; x <= 62; x += 4) ib('door', boxGeo, M.door, x, 1.1, 29.85, 1.2, 2.2, 0.08, 0, false);
+  reg('bhkw', g, { name: 'Blockheizkraftwerk', kks: 'BHKW · V6.1',
+    text: 'Verwertung des Faulgases in einem Gasmotor mit Generator. Die Abwärme beheizt über das Heizwasser den Faulturm und die Gebäude, der Strom deckt einen Teil des Eigenbedarfs der Kläranlage.',
+    rows: [['Aggregat', 'Faulgas-Motor mit Generator (Container)'], ['Gasverdichter', 'V6.1 Seitenkanalverdichter'], ['Wärme', 'Heizwasser ⇄ W10.1 (Faulturm)']] });
+}
+// Fackel
+{
+  const g = new THREE.Group();
+  box(g, 5, 0.3, 5, M.concrete, 98, 0, 70);
+  cyl(g, 0.9, 0.9, 8, M.steel, 98, 0.3, 70, 24); cyl(g, 0.95, 0.95, 1.2, M.steelDark, 98, 7.3, 70, 24);
+  railing([[95.5, 67.5], [100.5, 67.5], [100.5, 72.5], [95.5, 72.5], [95.5, 67.5]], 0.3, 1.8);
+  reg('fackel', g, { name: 'Gasfackel F6.1', kks: 'F6.1',
+    text: 'Sicherheitseinrichtung: verbrennt Überschussgas, wenn der Gasspeicher voll ist oder das BHKW nicht abnehmen kann. Geschlossene Brennkammer – die Flamme ist von außen nicht sichtbar.',
+    rows: [['Bauart', 'Hochtemperaturfackel (geschlossen)'], ['Betrieb', 'nur bei Gasüberschuss']] });
+}
+// Schlammentwässerung + Silo
+{
+  const g = new THREE.Group();
+  building(g, -4, 77, 16, 12, 8, { wall: M.sheet, roof: M.roof, winStep: 4, doors: [{ s: 'n', off: -3, w: 4, h: 4.5 }] });
+  const sx = -20, sz = 77;
+  for (const [dx, dz] of [[-1.6, -1.6], [1.6, -1.6], [1.6, 1.6], [-1.6, 1.6]]) box(g, 0.3, 5, 0.3, M.steelDark, sx + dx, 0, sz + dz);
+  cyl(g, 0.5, 2.3, 1.8, M.pe, sx, 5, sz, 32); cyl(g, 2.3, 2.3, 7, M.pe, sx, 6.8, sz, 32);
+  const sc = cyl(g, 0.35, 0.35, 9, M.steel, -14.5, 0, 77, 12); sc.rotation.z = 1.05; sc.position.y = 9.5;
+  reg('sew', g, { name: 'Schlammentwässerung + Silo', kks: 'Z6.1 · P6.3 · P8.1 · FS6.1 · SI6.1',
+    text: 'Maschinelle Entwässerung des ausgefaulten Schlamms mit Polymerkonditionierung. Der Schlammkuchen wird per Rohrschnecke ins Silo gefördert und von dort zur Verwertung abgefahren; das Zentrat läuft zum Hebewerk zurück.',
+    rows: [['Zentrifuge', 'Z6.1 Dekanter'], ['Beschickung', 'P6.3, FU'], ['Polymer', 'P8.1 ProMinent Sigma S1Cb'], ['Austrag', 'FS6.1 Rohrschnecke → Silo SI6.1 → Verwertung']] });
+}
+// Betriebsgebäude + Werkstatt
+{
+  const g = new THREE.Group();
+  building(g, -80, 38, 32, 14, 7.5, { floors: 2, band: true, doors: [{ s: 's', off: -6, w: 2, h: 2.4 }] });
+  box(g, 5, 0.25, 3, M.roof, -86, 3, 46.5);
+  const cv = document.createElement('canvas'); cv.width = 1024; cv.height = 96; const c2 = cv.getContext('2d');
+  c2.font = 'bold 70px Arial'; c2.fillStyle = '#2b3a4a'; c2.textAlign = 'center'; c2.textBaseline = 'middle'; c2.fillText('KLÄRANLAGE SCHWIERBACH', 512, 50);
+  const st = new THREE.CanvasTexture(cv); st.colorSpace = THREE.SRGBColorSpace;
+  const sign = new THREE.Mesh(new THREE.PlaneGeometry(16, 1.5), new THREE.MeshStandardMaterial({ map: st, transparent: true, roughness: .6 }));
+  sign.position.set(-74, 6.6, 45.08); g.add(sign);
+  building(g, -80, 80, 20, 14, 6, { wall: M.sheet, gable: 2.2, win: false, doors: [{ s: 'n', off: -4, w: 4, h: 4 }, { s: 'n', off: 4, w: 4, h: 4 }] });
+  reg('bg', g, { name: 'Betriebsgebäude + Werkstatt', kks: 'UV-5',
+    text: 'Leitwarte mit Prozessleitsystem, Betriebslabor, Sozial- und Büroräume. Gegenüber: Werkstatt- und Lagerhalle.',
+    rows: [['Räume', 'Leitwarte (PLS), Labor, Sozialräume, Büro'], ['Energie', 'Unterverteilung UV-5 (Gebäude, Labor, Werkstatt)']] });
+}
+// PKW
+{
+  const cols = [0x2d3436, 0xdfe6e9, 0x0984e3, 0xb2bec3, 0xd63031, 0x636e72, 0xffffff, 0x1e3799];
+  const body = new THREE.InstancedMesh(boxGeo, std(0xffffff, { r: .35, m: .5 }), 9), cab = new THREE.InstancedMesh(boxGeo, M.window, 9), o = new THREE.Object3D();
+  for (let i = 0; i < 9; i++) {
+    const x = -120.6 + i * 2.8 + (i > 4 ? 0 : 0), z = i % 2 ? 25 : 47;
+    o.position.set(x, 0.85, z); o.scale.set(1.8, 1.0, 4.3); o.updateMatrix(); body.setMatrixAt(i, o.matrix); body.setColorAt(i, new THREE.Color(cols[i % 8]));
+    o.position.set(x, 1.65, z + 0.2); o.scale.set(1.6, 0.65, 2.3); o.updateMatrix(); cab.setMatrixAt(i, o.matrix);
+  }
+  body.castShadow = cab.castShadow = true; scene.add(body, cab);
+}
+
+// ------------------------------------------------------------------ Bäume
+{
+  const rnd = (() => { let s = 7; return () => (s = (s * 16807) % 2147483647) / 2147483647; })();
+  const T = [];
+  const ok = (x, z) => {
+    if (x > FENCE.x0 - 4 && x < FENCE.x1 + 4 && z > FENCE.z0 - 4 && z < FENCE.z1 + 4) return false;
+    if (Math.abs(z - 60) < 7 && x < FENCE.x0) return false;
+    return creekDist(x, z) > 7.5;
+  };
+  for (let n = 0; n < 2500 && T.length < 260; n++) {
+    const x = -260 + rnd() * 560, z = -230 + rnd() * 460;
+    const near = Math.min(Math.abs(x - FENCE.x0), Math.abs(x - FENCE.x1), Math.abs(z - FENCE.z0), Math.abs(z - FENCE.z1));
+    if ((x < -170 && Math.abs(z - 60) > 6) && rnd() > 0.08) continue;      // Feldflur nur wenige Bäume
+    if (near > 30 && rnd() > 0.35) continue;
+    if (ok(x, z)) T.push([x, z]);
+  }
+  for (let z = -240; z < 240; z += 5) for (const side of [-1, 1]) if (rnd() > 0.25) { const x = creekX(z) + side * (8.5 + rnd() * 6); if (ok(x, z)) T.push([x, z + rnd() * 3]); }
+  const crown = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 1), new THREE.MeshStandardMaterial({ roughness: .9, flatShading: true }), T.length);
+  const trunk = new THREE.InstancedMesh(cylGeo, M.trunk, T.length), o = new THREE.Object3D(), c = new THREE.Color();
+  T.forEach(([x, z], i) => {
+    const conifer = rnd() < 0.15, h = 3 + rnd() * 2.5, r = conifer ? 1.8 + rnd() : 2.3 + rnd() * 2;
+    o.position.set(x, h / 2, z); o.scale.set(0.45, h, 0.45); o.rotation.set(0, 0, 0); o.updateMatrix(); trunk.setMatrixAt(i, o.matrix);
+    o.position.set(x, h + r * (conifer ? 1.6 : 0.8), z); o.scale.set(r, r * (conifer ? 2.4 : 1.25), r); o.rotation.y = rnd() * 6; o.updateMatrix(); crown.setMatrixAt(i, o.matrix);
+    crown.setColorAt(i, c.setHSL(conifer ? 0.36 : 0.22 + rnd() * 0.08, 0.45, 0.24 + rnd() * 0.1));
+  });
+  crown.castShadow = trunk.castShadow = true; scene.add(crown, trunk);
+}
+flushInst();
+
+// ------------------------------------------------------------------ Fließwege (Overlay)
+const FLOW = {
+  aw: { n: 'Abwasser', c: 0xa6814f, y: 2.2, p: [[[-160, -40], [-46, -40]], [[-46, -40], [-46, -58], [-37, -58]], [[-46, -40], [-46, -22], [-37, -22]], [[-19, -58], [-6, -58], [-6, -52], [0, -52]], [[-19, -22], [-6, -22], [-6, -28], [0, -28]], [[56, -52], [80, -52], [80, -62], [102, -62]], [[56, -28], [80, -28], [80, -18], [102, -18]]] },
+  ab: { n: 'Ablauf (gereinigt)', c: 0x2fa8e0, y: 2.2, p: [[[118, -62], [124, -62], [124, -40], [creekX(-40) - 4, -40]], [[118, -18], [124, -18], [124, -40]]] },
+  rs: { n: 'Rücklaufschlamm', c: 0xe17055, y: 2.9, p: [[[102, -62], [76, -46], [72, -40]], [[102, -18], [76, -34], [72, -40]], [[72, -40], [2, -40]], [[2, -40], [2, -52]], [[2, -40], [2, -28]]] },
+  lu: { n: 'Prozessluft', c: 0x9ad8ff, y: 3.5, p: [[[28, -4], [28, -40]], [[28, -40], [52, -40]], [[34, -40], [34, -52]], [[34, -40], [34, -28]], [[46, -40], [46, -52]], [[46, -40], [46, -28]]] },
+  fm: { n: 'Fällmittel FeCl₃', c: 0xb98be0, y: 3.0, p: [[[62, -4], [62, -38], [55, -38]]] },
+  sl: { n: 'Schlamm (PS/ÜS/DS/FS)', c: 0x7a5233, y: 2.6, p: [[[-28, -58], [-28, 34]], [[72, -40], [72, 20], [-22, 20], [-24, 34]], [[-25, 40], [-8, 40], [28, 45]], [[28, 45], [12, 62], [-4, 77]]] },
+  gs: { n: 'Faulgas', c: 0xf1c40f, y: 4.0, p: [[[28, 45], [70, 58]], [[70, 58], [58, 28]], [[70, 58], [98, 70]]] },
+  as: { n: 'Mischwasserabschlag', c: 0xd63031, y: 2.2, p: [[[-14, -40], [-14, -92], [creekX(-92) - 4, -92]]] }
+};
+const flowMats = [], flowGroup = new THREE.Group(); flowGroup.visible = false; scene.add(flowGroup);
+for (const k in FLOW) {
+  const f = FLOW[k];
+  for (const line of f.p) {
+    const path = new THREE.CurvePath(); let L = 0;
+    for (let i = 0; i < line.length - 1; i++) {
+      const a = new THREE.Vector3(line[i][0], f.y, line[i][1]), b = new THREE.Vector3(line[i + 1][0], f.y, line[i + 1][1]);
+      path.add(new THREE.LineCurve3(a, b)); L += a.distanceTo(b);
+    }
+    const mat = new THREE.ShaderMaterial({
+      uniforms: { uC: { value: new THREE.Color(f.c) }, uT: { value: 0 }, uL: { value: L } }, transparent: true,
+      vertexShader: 'varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
+      fragmentShader: 'uniform vec3 uC; uniform float uT; uniform float uL; varying vec2 vUv; void main(){ float s=fract(vUv.x*uL/4.0-uT*0.5); float on=step(s,0.6); gl_FragColor=vec4(uC*(0.75+0.45*on),0.55+0.45*on);}'
+    });
+    flowMats.push(mat);
+    flowGroup.add(new THREE.Mesh(new THREE.TubeGeometry(path, Math.max(8, Math.ceil(L)), 0.38, 8, false), mat));
+  }
+}
+const legend = document.getElementById('legend');
+legend.innerHTML = Object.values(FLOW).map(f => `<div><i style="background:#${new THREE.Color(f.c).getHexString()}"></i>${f.n}</div>`).join('') + '<div style="color:#8395a7;margin-top:3px">schematisch, Leitungen liegen erdverlegt</div>';
+
+// ------------------------------------------------------------------ UI: Labels, Auswahl, Rundgang
+const TOUR = ['zpw', 'rechen', 'sandfang', 'vk', 'abschlag', 'bb', 'geblaese', 'fecl3', 'nk', 'rs', 'ablauf', 've', 'ft', 'gs', 'bhkw', 'fackel', 'sew', 'bg', 'bach'];
+const SHORT = { zpw: 'Hebewerk', rechen: 'Rechen', sandfang: 'Sandfang', vk: 'VK1/VK2', abschlag: 'SV-201', bb: 'Belebung', geblaese: 'Gebläse', fecl3: 'FeCl₃', nk: 'NK1/NK2', rs: 'RS-PW', ablauf: 'Ablauf', ve: 'VE-1', ft: 'FT-1', gs: 'GS-1', bhkw: 'BHKW', fackel: 'F6.1', sew: 'Z6.1/SI6.1', bg: 'Betriebsgeb.', bach: 'Schwierbach' };
+const labelBox = document.getElementById('labels');
+for (const id of TOUR) {
+  const el = document.createElement('div'); el.className = 'lbl'; el.textContent = SHORT[id];
+  el.addEventListener('click', e => { e.stopPropagation(); select(id, true); });
+  labelBox.appendChild(el); comps[id].el = el;
+}
+const marker = new THREE.Mesh(new THREE.RingGeometry(0.93, 1, 72).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xffd54a, transparent: true, depthWrite: false }));
+marker.visible = false; scene.add(marker);
+
+const info = document.getElementById('info'), infoBody = document.getElementById('infoBody'), tname = document.getElementById('tname');
+let selected = null, tourIdx = -1, auto = null;
+function select(id, fly) {
+  selected = id; const c = comps[id];
+  for (const k in comps) comps[k].el?.classList.toggle('sel', k === id);
+  marker.visible = id !== 'bach'; marker.position.set(c.center.x, 0.12, c.center.z); marker.scale.setScalar(c.radius + 2.5);
+  infoBody.innerHTML = `<h2>${c.name}</h2><div class="kks">${c.kks}</div><p>${c.text}</p><table>${c.rows.map(r => `<tr><td class="k">${r[0]}</td><td>${r[1]}</td></tr>`).join('')}</table>` +
+    (c.note ? '<div class="note">* Abmessung für die 3D-Ansicht angenommen (in der PLS-Simulation nicht festgelegt).</div>' : '');
+  info.style.display = 'block'; layout();
+  tourIdx = TOUR.indexOf(id);
+  tname.innerHTML = `${c.name} <small>${tourIdx + 1}/${TOUR.length}</small>`;
+  if (fly) {
+    const d = Math.min(160, Math.max(34, c.radius * 2.4 + 20));
+    const dir = new THREE.Vector3(-0.35, 0.72, 0.9).normalize();
+    const tgt = id === 'bach' ? new THREE.Vector3(creekX(-40), 0, -40) : c.center.clone(); tgt.z += d * 0.2;
+    flyTo(tgt, tgt.clone().addScaledVector(dir, id === 'bach' ? 70 : d));
+  }
+}
+function deselect() { selected = null; marker.visible = false; info.style.display = 'none'; for (const k in comps) comps[k].el.classList.remove('sel'); layout(); }
+let fly = null;
+function flyTo(target, pos, dur = 1.6) { fly = { t0: performance.now(), dur: dur * 1000, ft: controls.target.clone(), fp: camera.position.clone(), tt: target, tp: pos }; }
+const homePos = () => innerWidth / innerHeight < 0.8 ? new THREE.Vector3(-345, 290, 105) : new THREE.Vector3(-150, 185, 235);
+const homeTgt = () => innerWidth / innerHeight < 0.8 ? new THREE.Vector3(5, 0, 0) : new THREE.Vector3(0, 0, 0);
+const HOME = () => flyTo(homeTgt(), homePos());
+
+function stopAuto() { if (auto) { clearInterval(auto); auto = null; document.getElementById('bAuto').classList.remove('on'); document.getElementById('bAuto').textContent = '▶ Auto'; } }
+document.getElementById('bNext').onclick = () => { stopAuto(); select(TOUR[(tourIdx + 1) % TOUR.length], true); };
+document.getElementById('bPrev').onclick = () => { stopAuto(); select(TOUR[(tourIdx - 1 + TOUR.length) % TOUR.length], true); };
+tname.onclick = () => { if (tourIdx < 0) select(TOUR[0], true); };
+document.getElementById('bAuto').onclick = e => {
+  if (auto) return stopAuto();
+  e.target.classList.add('on'); e.target.textContent = '❚❚ Pause';
+  select(TOUR[(tourIdx + 1) % TOUR.length], true);
+  auto = setInterval(() => select(TOUR[(tourIdx + 1) % TOUR.length], true), 7000);
+};
+document.getElementById('bHome').onclick = () => { stopAuto(); deselect(); tourIdx = -1; tname.textContent = 'Rundgang starten ›'; HOME(); };
+document.getElementById('close').onclick = deselect;
+let showLbl = true;
+document.getElementById('bLbl').onclick = e => { showLbl = !showLbl; e.target.classList.toggle('on', showLbl); labelBox.style.display = showLbl ? '' : 'none'; };
+document.getElementById('bFlow').onclick = e => { flowGroup.visible = !flowGroup.visible; e.target.classList.toggle('on', flowGroup.visible); legend.style.display = flowGroup.visible ? 'block' : 'none'; layout(); };
+const SPEEDS = [1, 20, 100]; let speed = 100;
+document.getElementById('bSpeed').onclick = e => { speed = SPEEDS[(SPEEDS.indexOf(speed) + 1) % 3]; e.target.textContent = speed === 1 ? 'Räumer Echtzeit' : `Räumer ×${speed}`; };
+controls.addEventListener('start', () => { fly = null; stopAuto(); });
+
+// Tippen/Klicken auf Bauwerke
+const ray = new THREE.Raycaster(), ndc = new THREE.Vector2(); let down = null;
+canvas.addEventListener('pointerdown', e => { down = [e.clientX, e.clientY]; });
+canvas.addEventListener('pointerup', e => {
+  if (!down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 6) return;
+  ndc.set(e.clientX / innerWidth * 2 - 1, -(e.clientY / innerHeight) * 2 + 1); ray.setFromCamera(ndc, camera);
+  const h = ray.intersectObjects(pickables, false)[0];
+  if (h) select(h.object.userData.comp, false); else deselect();
+});
+
+function layout() {
+  const bh = document.getElementById('bottom').offsetHeight;
+  info.style.bottom = (bh + 8) + 'px';
+  legend.style.bottom = (bh + 8 + (info.style.display === 'block' ? info.offsetHeight + 8 : 0)) + 'px';
+}
+function resize() { renderer.setSize(innerWidth, innerHeight, false); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); layout(); }
+addEventListener('resize', resize); resize();
+camera.position.copy(homePos()); controls.target.copy(homeTgt());
+
+// ------------------------------------------------------------------ Animation
+const clock = new THREE.Clock(), o3 = new THREE.Object3D(), pv = new THREE.Vector3();
+let elapsed = 0;
+function tick() {
+  const dt = Math.min(clock.getDelta(), 0.1); elapsed += dt;
+  for (const a of anims) {
+    if (a.type === 'rot') a.obj.rotation.y -= a.omega * dt * speed;
+    else { a.s = (a.s ?? 0) + a.v * dt * speed; const L = a.b - a.a, ph = a.s % (2 * L); a.obj.position.x = a.a + (ph < L ? ph : 2 * L - ph); }
+  }
+  bubbles.forEach((b, i) => {
+    const s = 0.25 + 0.95 * Math.pow(Math.abs(Math.sin(elapsed * b[4] + b[3])), 3);
+    o3.position.set(b[0], b[1], b[2]); o3.scale.set(s, 1, s); o3.updateMatrix(); bubbleMesh.setMatrixAt(i, o3.matrix);
+  });
+  bubbleMesh.instanceMatrix.needsUpdate = true;
+  for (const w of waters) { w.tex.offset.x += w.flow[0] * dt; w.tex.offset.y += w.flow[1] * dt; }
+  for (const m of flowMats) m.uniforms.uT.value = elapsed;
+  if (marker.visible) marker.material.opacity = 0.55 + 0.45 * Math.sin(elapsed * 4);
+  if (fly) {
+    let t = Math.min(1, (performance.now() - fly.t0) / fly.dur); const e = t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    controls.target.lerpVectors(fly.ft, fly.tt, e); camera.position.lerpVectors(fly.fp, fly.tp, e);
+    if (t >= 1) fly = null;
+  }
+  controls.update();
+  renderer.render(scene, camera);
+  if (showLbl) for (const id of TOUR) {
+    const c = comps[id]; pv.copy(c.anchor).project(camera);
+    if (pv.z > 1 || Math.abs(pv.x) > 1.05 || Math.abs(pv.y) > 1.05) { c.el.style.display = 'none'; continue; }
+    c.el.style.display = ''; c.el.style.transform = `translate(${(pv.x * .5 + .5) * innerWidth}px,${(-pv.y * .5 + .5) * innerHeight}px) translate(-50%,-100%)`;
+  }
+  requestAnimationFrame(tick);
+}
+window.__ka3d = { THREE, scene, renderer, camera, controls };
+document.getElementById('load').remove();
+tick();
+</script>
+</body>
+</html>
