@@ -2694,8 +2694,8 @@ def _(
                 <h3 style="color:#0984e3">🏗️ Füllstandsregelung</h3>
                 <table class="pls-tbl">
                     <tr><td>Regelgröße</td><td class="c-v">Füllstand h [m]</td></tr>
-                    <tr><td>Stellgröße</td><td class="c-v">Pumpendrehzahl / Ventilstellung</td></tr>
-                    <tr><td>Störgrößen</td><td class="c-v">Zulaufschwankungen, Verbraucher</td></tr>
+                    <tr><td>Stellgröße</td><td class="c-v">Zulaufvolumenstrom (Pumpe mit FU)</td></tr>
+                    <tr><td>Störgröße</td><td class="c-v">Ablauf zur Belebung (wasserstandsabhängig)</td></tr>
                     <tr><td>Reglertyp</td><td class="c-v">P-, PI-, PID-Regler (wählbar)</td></tr>
                     <tr><td>Besonderheit</td><td class="c-v">Vergleich der Reglertypen</td></tr>
                 </table>
@@ -2703,13 +2703,14 @@ def _(
                     <p style="font-size:0.85em;color:#dfe6e9;margin:0 0 6px">
                         <strong style="color:#0984e3">Lernziele:</strong> Unterschied P/PI/PID-Regler verstehen,
                         bleibende Regelabweichung beim P-Regler beobachten,
-                        Einfluss von Kp, Tn, Tv auf Sprungantwort analysieren.
+                        Einfluss von K<sub>P</sub>, K<sub>I</sub>, K<sub>D</sub> auf die Sprungantwort analysieren.
                     </p>
                     <p style="font-size:0.85em;color:#dfe6e9;margin:0 0 8px">
                         <strong style="color:#0984e3">Bezug zur Kläranlage:</strong>
-                        Im Zulaufpumpwerk regelt der FU der Zulaufpumpe P1.1 den Wasserstand im Pumpensumpf.
-                        Bei steigendem Zulauf (z.B. Regen) muss die Drehzahl schnell nachgeführt werden,
-                        um Überflutung zu vermeiden – ein klassisches Füllstandsregelungsproblem.
+                        Das Ausgleichsbecken vor der Belebung (Rundbecken, D&nbsp;=&nbsp;12,6&nbsp;m) wird von einer
+                        drehzahlgeregelten Pumpe beschickt (Arbeitspunkt ca. 500&nbsp;m³/h). Der Bodenablauf zur Belebung
+                        hängt vom Wasserstand ab – nur ein konstanter Füllstand (Sollwert 3,0&nbsp;m) sorgt für eine
+                        gleichmäßige Beschickung der Belebung und schützt die Nachklärung vor hydraulischer Überlastung.
                     </p>
                     <a href="https://mein-hsbk.github.io/Fuellstandsregelung/"
                        target="_blank"
@@ -3728,13 +3729,33 @@ def _(
 <circle cx="415" cy="158" r="10" fill="#ffffff" stroke="#3a6090" stroke-width="1.2"/>
 <text x="415" y="156.5" text-anchor="middle" fill="#1a3a70" font-size="6.8">QI</text>
 <text x="415" y="164.5" text-anchor="middle" fill="#1a3050" font-size="6">105</text>
-<path class="p-aw" d="M 450,240 L 490,240" marker-end="url(#aaw)"/>
+<path class="p-aw" d="M 450,240 L 480,240 L 480,118 L 489,118"/>
+<path class="p-aw" d="M 503,118 L 512,118" marker-end="url(#aaw)"/>
+<path class="p-aw" d="M 544,136 L 544,170" marker-end="url(#aaw)"/>
+<!-- AUSGLEICHSBECKEN AB-1 mit Beschickungspumpe P2.1 und LIC 203 -->
+<path d="M 512,96 L 512,136 L 556,136 L 556,96" fill="#e6f1fb" stroke="#203060" stroke-width="1.5"/>
+<line x1="514" y1="106" x2="554" y2="106" stroke="#1e90e8" stroke-width="0.9" stroke-dasharray="4,2"/>
+<path d="M 547,101 L 553,101 L 550,105.5 Z" fill="#1e90e8"/>
+<text x="534" y="124" text-anchor="middle" fill="#204090" font-size="7" font-weight="bold">AB-1</text>
+<text x="534" y="132" text-anchor="middle" fill="#0e1838" font-size="5">D 12,6 m</text>
+<text x="534" y="91" text-anchor="middle" fill="#0e1838" font-size="5.5">Ausgleichsbecken</text>
+<circle cx="496" cy="118" r="7" fill="#ffffff" stroke="#1e70c0" stroke-width="1.5"/>
+<path d="M 491,113.5 L 502,118 L 491,122.5 Z" fill="#1e70c0"/>
+<line x1="496" y1="111" x2="496" y2="108" stroke="#8898a8" stroke-width="1.2"/>
+<rect x="490" y="99" width="12" height="9" rx="1.5" fill="#e8edf8" stroke="#203050" stroke-width="1"/>
+<text x="496" y="106.5" text-anchor="middle" fill="#304060" font-size="6.5">M</text>
+<text x="496" y="134" text-anchor="middle" fill="#1a3870" font-size="6.5">P2.1</text>
+<path class="p-sig" d="M 556,110 L 562,110"/>
+<path class="p-sig" d="M 572,100 L 572,84 L 496,84 L 496,99"/>
+<circle cx="572" cy="110" r="10" fill="#ffffff" stroke="#3a6090" stroke-width="1.2"/>
+<text x="572" y="108.5" text-anchor="middle" fill="#1a3a70" font-size="6.8">LIC</text>
+<text x="572" y="116.5" text-anchor="middle" fill="#1a3050" font-size="6">203</text>
 <path class="p-abs" d="M 468,240 L 468,74 L 1190,74 L 1190,240"/>
 <circle cx="468" cy="240" r="2.8" fill="#e03848"/>
 <path d="M 463.2,190 L 468,196 L 472.8,190 Z M 463.2,202 L 468,196 L 472.8,202 Z" fill="#c03040"/>
-<line x1="468" y1="196" x2="476" y2="196" stroke="#8898a8" stroke-width="1.2"/>
-<rect x="476" y="191.5" width="12" height="9" rx="1.5" fill="#e8edf8" stroke="#203050" stroke-width="1"/>
-<text x="482" y="199" text-anchor="middle" fill="#304060" font-size="6.5">M</text>
+<line x1="463" y1="196" x2="468" y2="196" stroke="#8898a8" stroke-width="1.2"/>
+<rect x="452" y="191.5" width="11" height="9" rx="1.5" fill="#e8edf8" stroke="#203050" stroke-width="1"/>
+<text x="457.5" y="199" text-anchor="middle" fill="#304060" font-size="6.5">M</text>
 <text x="465" y="181" text-anchor="end" fill="#c03040" font-size="5.5">SV-201</text>
 <text x="984" y="88" text-anchor="middle" fill="#c03040" font-size="7" font-weight="bold">Mischwasserabschlag</text>
 <text x="984" y="97" text-anchor="middle" fill="#c03040" font-size="6.5">(nur mech. gereinigt)</text>
@@ -4082,7 +4103,7 @@ def _(
 <rect x="6" y="474" width="1588" height="2" fill="#0e2040" fill-opacity="0.4"/>
 
 <!-- ─── LEGENDE ─── -->
-<rect x="6" y="480" width="450" height="629" rx="4" fill="#f8fafc" stroke="#1a3050" stroke-width="1.2"/>
+<rect x="6" y="480" width="450" height="637" rx="4" fill="#f8fafc" stroke="#1a3050" stroke-width="1.2"/>
 <text x="231" y="496" text-anchor="middle" fill="#1a4080" font-size="10" font-weight="bold">LEGENDE</text>
 
 <text x="18" y="514" fill="#1a4080" font-size="8.5" font-weight="bold">Rohrleitungen:</text>
@@ -4188,7 +4209,7 @@ def _(
 <text x="274" y="937" fill="#0e2040" font-size="8">Elektromotor / Stellantrieb</text>
 
 <!-- ─── AGGREGATLISTE ─── -->
-<rect x="462" y="480" width="570" height="629" rx="4" fill="#f8fafc" stroke="#1a3050" stroke-width="1.2"/>
+<rect x="462" y="480" width="570" height="637" rx="4" fill="#f8fafc" stroke="#1a3050" stroke-width="1.2"/>
 <text x="747" y="496" text-anchor="middle" fill="#1a4080" font-size="10" font-weight="bold">AGGREGATLISTE (Kurzform)</text>
 <rect x="468" y="503" width="558" height="15" fill="#dce4f0"/>
 <text x="476" y="514" fill="#1a4080" font-size="8" font-weight="bold">KKS</text>
@@ -4243,9 +4264,10 @@ def _(
   <line x1="468" y1="887" x2="1026" y2="887" stroke="#dce4f0" stroke-width="0.7"/>
   <text x="476" y="899">W10.1</text><text x="514" y="899">Schlammwärmetauscher Umwälzkreis FT-1</text><text x="780" y="899">Rohr-in-Rohr, Heizwasser BHKW</text>
   <line x1="468" y1="903" x2="1026" y2="903" stroke="#dce4f0" stroke-width="0.7"/>
+  <text x="476" y="915">P2.1</text><text x="514" y="915">Beschickungspumpe Ausgleichsbecken AB-1, FU</text><text x="780" y="915">Tauchmotorpumpe KP, ~500 m³/h</text>
 </g>
-<text x="476" y="921" fill="#1a4080" font-size="8.5" font-weight="bold">MSR-Messgeräte:</text>
-<g fill="#334860" font-size="7.2">
+<text x="476" y="931" fill="#1a4080" font-size="8.5" font-weight="bold">MSR-Messgeräte:</text>
+<g fill="#334860" font-size="7.2" transform="translate(0,10)">
   <text x="476" y="934">FI 101</text><text x="526" y="934">Durchfluss Zulauf (MID)</text>
   <text x="476" y="946.5">QI 102</text><text x="526" y="946.5">Spektralsonde Zulauf (CSB, AFS)</text>
   <text x="476" y="959">LI 103</text><text x="526" y="959">Füllstand Pumpensumpf</text>
@@ -4273,21 +4295,22 @@ def _(
   <text x="752" y="1059">XA 615</text><text x="802" y="1059">Körperschall P6.2</text>
   <text x="752" y="1071.5">LI 701</text><text x="802" y="1071.5">Füllstand FeCl₃-Behälter</text>
   <text x="752" y="1084">FIC 702</text><text x="802" y="1084">Dosierstrom FeCl₃</text>
+  <text x="752" y="1096.5">LIC 203</text><text x="802" y="1096.5">Füllstand AB-1 → P2.1 (PI)</text>
 </g>
 
 <!-- ─── ANMERKUNGEN ─── -->
-<rect x="1038" y="480" width="556" height="629" rx="4" fill="#f8fafc" stroke="#1a3050" stroke-width="1.2"/>
+<rect x="1038" y="480" width="556" height="637" rx="4" fill="#f8fafc" stroke="#1a3050" stroke-width="1.2"/>
 <text x="1316" y="496" text-anchor="middle" fill="#1a4080" font-size="10" font-weight="bold">ANMERKUNGEN / VERFAHRENSSCHEMA</text>
 <g font-size="8.5">
   <text x="1050" y="514" fill="#1a4080">Verfahren:</text>
-  <text x="1050" y="527" fill="#334860">Vorklärung → Vorentst.-zone (Deni, anoxisch) → Nitrifikation (aerob)</text>
+  <text x="1050" y="527" fill="#334860">Vorklärung → Ausgleichsbecken AB-1 → Deni (anoxisch) → Nitrifikation (aerob)</text>
   <text x="1050" y="539" fill="#334860">→ Nachklärung → Simultanfällung P (FeCl₃) → Ablauf Schwierbach</text>
   <text x="1050" y="558" fill="#1a4080">Regelungen:</text>
   <text x="1050" y="570" fill="#334860">• Belüftung: Kaskade QIC 301 (O₂) → FIC 201 (Luftmenge) → FU G1.1</text>
   <text x="1050" y="582" fill="#334860">• RS-Verhältnis: Stufenschaltung P3.1–P3.6, Sollwert ~0,75</text>
   <text x="1050" y="594" fill="#334860">• ÜS-Menge: Zeitprogramm P5.1, Schlammalter-gesteuert</text>
   <text x="1050" y="606" fill="#334860">• Fällmitteldos.: PI-Regler auf P-ges (QI 501), Stellglied P7.1</text>
-  <text x="1050" y="618" fill="#334860">• Zulaufpumpe: FU-Regelung auf Füllstand LI 103</text>
+  <text x="1050" y="618" fill="#334860">• Zulaufpumpe P1.1: FU auf LI 103  |  P2.1: PI-Regler auf LIC 203 (AB-1, Soll 3,0 m)</text>
   <text x="1050" y="630" fill="#334860">• pH 504: Überwachung Ablauf (Säurekapazität, Nitrifikation)</text>
   <text x="1050" y="650" fill="#1a4080">Grenzwerte Ablauf (Eigenkontrolle):</text>
   <text x="1050" y="662" fill="#334860">• CSB &lt; 75 mg/L (Erlaubnis)  |  BSB₅ &lt; 15 mg/L</text>
