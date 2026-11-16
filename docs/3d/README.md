@@ -11,33 +11,43 @@ wenn der Ordner `docs/` z. B. von einem Schulrechner ausgeliefert wird.
   Desktop: W A S D gehen, Maus ziehen = umsehen, Shift = schneller, E oder Klick = Instrument ansehen,
   Tab = Leitwarte. Tablet/Handy: links unten ziehen = gehen, rechts ziehen = umsehen, Instrument antippen.
 
-## Faulungssimulation
+## Simulation und Missionen
 
-Die Faulung (Faulturm, Maschinenhaus, Gasspeicher, Gasstrecke, BHKW, Fackel) läuft mit einem eigenen,
-vereinfachten Prozessmodell im Zeitraffer. Vor-Ort-Instrumente zeigen live die Modellwerte, einige sind
-bedienbar (Kugelhahn HA 611, BHKW quittieren, Motorschutz P11.1). Die Leitwarte zeigt bewusst nur
-Sammelstörungen. Über „Szenario“ lassen sich Störungen starten:
+Faulung/Gas und Belüftung laufen als eigene, vereinfachte Prozessmodelle im Zeitraffer; die Gebläseleistung
+geht in den Eigenbedarf der Energiebilanz ein. Vor-Ort-Instrumente zeigen live die Modellwerte, einige sind
+bedienbar. Die Leitwarte (Reiter Faulung/Gas und Belüftung) zeigt bewusst nur Sammelmeldungen; die
+O₂-Regler QIC 301/311 lassen sich dort bedienen (AUTO/HAND, Sollwert, Kp, Tn, Hand-Stellwert).
 
-| Code | Inhalt (für Lehrkräfte) |
-|------|-------------------------|
-| S0 | Normalbetrieb |
-| S1 | HA 611 nach Wartung geschlossen → BHKW-Störung „Gasdruck min“, Speicher läuft voll, Fackel zündet |
-| S2 | Motorschutz Heizwasserpumpe P11.1 ausgelöst → Faulturm kühlt aus, CH4 sinkt, BHKW schaltet ab |
+Über „🎯 Missionen“ startet eine vorbereitete Betriebssituation: Auftrag (Briefing) → Start an der Leitwarte →
+Kontrollgang → „Beenden“ zeigt eine Auswertung (erfüllte Schritte, Energiekennzahl) und das Protokoll.
 
-Aktionen, angesehene Instrumente und Alarme landen im Protokoll (kopierbar).
+| Mission | Inhalt (für Lehrkräfte) |
+|---------|-------------------------|
+| Freies Üben | Normalbetrieb |
+| BHKW steht | HA 611 nach Wartung geschlossen → BHKW-Störung „Gasdruck min“, Speicher läuft voll, Fackel zündet |
+| Faulturm kühlt aus | Motorschutz Heizwasserpumpe P11.1 ausgelöst → Faulturm kühlt aus, CH4 sinkt, BHKW schaltet ab |
+| Stromfresser Gebläsestation | Belag auf O₂-Sonde QI 301 → Sonde zeigt zu wenig, Regler bläst zu viel Luft ein; fachgerecht: HAND, Sonde ziehen, reinigen, kalibrieren, AUTO |
+
+Die vollständigen Lösungshinweise stehen im Missionsmenü (aufklappbar) und in `js/missionen.js`.
+Neue Missionen: Eintrag in `MISSIONEN` mit Szenario-Codes (`faul`, `bel`), Startstation, Auftrag und Prüfschritten.
+Im Prüfungsmodus sind Beschriftungen, Schnellwahl und Erklärtexte ausgeblendet.
 
 ## Dateien
 
 | Datei | Inhalt |
 |-------|--------|
 | `index.html` | Gesamte Anlage (Geometrie, Rundgang, Infotexte, Fließwege, RS-Innenansicht), Oberfläche, Hauptschleife |
-| `js/faulung-modell.js` | Prozessmodell Faulung/Gas, Szenarien (reine Rechenlogik, ohne 3D) |
-| `js/faulung-sim.js` | laufender Zustand, Zeitraffer, Protokoll |
-| `js/faulung-szene.js` | 3D-Geometrie der Faulung inkl. Instrumente (Canvas-Texturen) und Animationen |
-| `js/faulung-ui.js` | Leitwarte, Detailansicht, Protokoll, Meldung, Szenario-Menü |
+| `js/faulung-modell.js` | Prozessmodell Faulung/Gas, Szenarien S0–S2 (reine Rechenlogik) |
+| `js/belueftung-modell.js` | Prozessmodell Belüftung: 2 Straßen, PI-Regler, Drehkolbengebläse, Sondenzustand, Szenarien B0/B1 |
+| `js/anlage-sim.js` | gemeinsamer Zustand, Zeitraffer, Kopplung der Modelle, Protokoll |
+| `js/instrumente.js` | Zeichenfunktionen und Registry der Vor-Ort-Instrumente |
+| `js/faulung-szene.js` | 3D der Faulung inkl. Instrumente und Animationen |
+| `js/belueftung-szene.js` | 3D der Gebläsestation, Luftverteilung, Sondenausleger; Blasenbild je Straße |
+| `js/anlage-ui.js` | Leitwarte mit Reglerbedienung, Detailansicht, Protokoll, Meldung |
+| `js/missionen.js` | Missionen: Auftrag, Start, Auswertung |
 | `js/begehung.js` | Ich-Perspektive: Steuerung, Kollision, Stationen, Instrument-Hinweis |
 | `vendor/` | three.js r160 (MIT) mit OrbitControls |
 
-Neue Instrumente entstehen in `faulung-szene.js` mit `makeInst(id, { name, tag, pos, rotY, size, draw, info, actions })`.
+Neue Instrumente entstehen in den `*-szene.js`-Dateien mit `makeInst(id, { name, tag, pos, rotY, size, draw, info, actions })`.
 Kollision: Alle sichtbaren Meshes zwischen 0,3 m und 1,6 m Höhe wirken als Hindernis (Bounding Box);
 dünne Teile wie Rohrleitungen werden mit `userData.noCol = true` ausgenommen.

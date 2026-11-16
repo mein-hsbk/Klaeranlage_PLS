@@ -8,7 +8,8 @@ export const P = {
   P_EL: 125,          // BHKW Nennleistung el. [kW]
   ETA_EL: 0.36,
   HU62: 6.4,          // Heizwert bei 62 % CH4 [kWh/Nm³]
-  BEDARF: 175,        // mittlerer elektrischer Eigenbedarf der Anlage [kW]
+  BEDARF: 175,        // mittlerer elektrischer Eigenbedarf der Anlage [kW] (ohne Kopplung)
+  GRUND: 92,          // Eigenbedarf ohne Gebläsestation [kW] (mit Kopplung an die Belüftung)
   T_SOLL: 37,         // Faulturmtemperatur [°C]
   P_GS: 22,           // Gasdruck Speicher (Stützluft) [mbar]
   P_VERD: 85,         // Druck nach Verdichter V6.1 [mbar]
@@ -117,7 +118,9 @@ export function step(s, dt, log) {
   s.fq608 += s.qProd * h;
   s.eBhkw += s.pel * h;
   s.vFackel += s.qFackel * h;
-  const bedarf = P.BEDARF * (1 + 0.15 * Math.sin(2 * Math.PI * (th - 9) / 24));
+  // Eigenbedarf: Grundlast der Anlage + Gebläseleistung aus der Belüftungssimulation (falls gekoppelt)
+  const grund = s.pGeb != null ? P.GRUND : P.BEDARF;
+  const bedarf = grund * (1 + 0.15 * Math.sin(2 * Math.PI * (th - 9) / 24)) + (s.pGeb ?? 0);
   s.bedarf = bedarf;
   s.eBezug += Math.max(0, bedarf - s.pel) * h;
 

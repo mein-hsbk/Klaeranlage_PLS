@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 
 export const STATIONEN = {
+  leitwarte: { n: 'Leitwarte', p: [-86, 49.5, -86, 44] },
   faulturm: { n: 'Faulturm', p: [27.2, 55.0, 28, 50] },
   maschinenhaus: { n: 'Maschinenhaus', p: [32.4, 58.6, 30.6, 57.2] },
   gaszaehler: { n: 'Gaszähler', p: [43.6, 45.6, 41.4, 45] },
@@ -10,8 +11,10 @@ export const STATIONEN = {
   gasstrecke: { n: 'Gasstrecke', p: [71.8, 44.2, 70, 46] },
   bhkw: { n: 'BHKW', p: [56, 32.8, 56, 30] },
   fackel: { n: 'Fackel', p: [92.2, 66.8, 93.8, 69.5] },
-  geblaese: { n: 'Gebläsestation', p: [28, 6, 28, -4] },
-  belebung: { n: 'Belebung', p: [60, -12, 40, -30] },
+  geblaese: { n: 'Gebläsestation', p: [24.2, -1.4, 25.6, -3.6] },
+  luftverteilung: { n: 'Luftverteilung', p: [24.8, -13.3, 22.4, -16.3] },
+  belebung1: { n: 'Belebung Str. 1', p: [46, -64.4, 46, -62.9] },
+  belebung2: { n: 'Belebung Str. 2', p: [46, -15.6, 46, -17.1] },
   nk: { n: 'Nachklärung', p: [102, 4, 102, -18] },
   rs: { n: 'RS-Pumpwerk', p: [82, -36, 72, -40] },
 };
