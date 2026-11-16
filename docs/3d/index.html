@@ -39,7 +39,7 @@
   #legend{position:fixed;right:8px;display:none;background:#16213ee6;border:1px solid #2d4a7a;border-radius:8px;padding:6px 8px;font-size:11px;line-height:1.55}
   #legend i{display:inline-block;width:16px;height:4px;border-radius:2px;margin-right:6px;vertical-align:middle}
   @media (max-width:520px){ #top .qmax{display:none} }
-  /* Begehung + Faulungssimulation */
+  /* Begehung, Anlagensimulation, Missionen */
   #simClock{font-size:11px;color:#b2bec3;font-family:monospace}
   .btn.alarm{background:#c0392b;border-color:#e74c3c;animation:bl 1s steps(2) infinite}
   @keyframes bl{50%{background:#7b241c}}
@@ -87,6 +87,34 @@
   #meldText{width:100%;min-height:110px;font-size:16px;border-radius:6px;padding:8px;background:#0f3460;color:#fff;border:1px solid #2d4a7a}
   #toast{position:fixed;left:50%;bottom:120px;transform:translateX(-50%);background:#2d3436;border:1px solid #636e72;padding:9px 14px;border-radius:8px;font-size:13.5px;display:none;z-index:9;max-width:90%}
   @media (max-width:600px){#top{gap:6px;padding-left:8px;padding-right:8px}#top h1{font-size:12px}#top .sub,#simClock,#bHome .t{display:none}#top .btn{padding:6px 7px;font-size:12px}}
+  #pls,#log,.card,.mis,#misBar{box-sizing:border-box}
+  body.mission #pls{top:calc(env(safe-area-inset-top) + 92px);max-height:calc(100% - 200px)}
+  #plsTabs{display:flex;gap:4px;flex:1;margin:0 8px}#plsTabs .btn{font-size:12px;padding:5px 8px}
+  #pls td.v.hd{color:#b2bec3;font-family:Arial;font-size:11px}
+  .fp{border:1px solid #2d4a7a;border-radius:8px;padding:6px 8px;margin:8px 0;background:#0b1424}
+  .fph{display:flex;align-items:center;gap:8px;font-size:12.5px}.fph b{font-family:monospace;color:#74b9ff}
+  .fph .mode{margin-left:auto;font-size:11px;padding:4px 8px;background:#00b894;border-color:#00b894;color:#0b1a2e;font-weight:bold}
+  .fph .mode.hand{background:#fdcb6e;border-color:#fdcb6e}
+  .fp .ist{font-size:11.5px;color:#b2bec3;margin:3px 0}
+  .fpi{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 10px}
+  .fpi label{font-size:11px;color:#b2bec3;display:flex;align-items:center;gap:4px;white-space:nowrap}
+  .fpi input{width:64px;font-size:14px;padding:3px 5px;border-radius:4px;border:1px solid #2d4a7a;background:#0f3460;color:#fff;font-family:monospace}
+  #trendB{width:100%;height:150px;display:block;border-radius:6px;margin-top:6px}
+  .card.wide{max-width:860px}
+  #misList{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px;margin-top:8px}
+  .mis{background:#0f3460;border:1px solid #2d4a7a;border-radius:10px;padding:10px 12px;display:flex;flex-direction:column}
+  .mis p{font-size:12.5px;line-height:1.45;color:#dfe6e9;margin:6px 0;flex:1}
+  .mis details{font-size:11.5px;color:#b2bec3;margin-bottom:8px}.mis details p{font-size:11.5px;color:#b2bec3}
+  .misT{display:flex;justify-content:space-between;gap:8px;font-size:14.5px;color:#ffeaa7}.misT .st{color:#fdcb6e;white-space:nowrap}
+  .misM{font-size:11.5px;color:#74b9ff}
+  .misOpt{margin-top:12px;max-width:420px}
+  .auftrag{font-size:14.5px;line-height:1.55;color:#dfe6e9;background:#0f3460;border-left:4px solid #fdcb6e;padding:10px 12px;border-radius:6px}
+  #misBar{position:fixed;left:8px;top:calc(env(safe-area-inset-top) + 52px);display:none;gap:6px;align-items:center;background:#16213ef0;border:1px solid #fdcb6e;border-radius:8px;padding:4px 6px 4px 10px;font-size:12.5px;z-index:2}
+  #misBar .btn{font-size:11.5px;padding:4px 8px}
+  .chk{list-style:none;padding:0;margin:8px 0;font-size:13.5px;line-height:1.7}.chk .ok{color:#55efc4}.chk .no{color:#ff7675}
+  .kz{font-size:13px;color:#ffeaa7;background:#0f3460;padding:8px 10px;border-radius:6px}
+  body.exam #walkSt,body.exam #labels{display:none !important}
+  @media (max-width:600px){#bMis .t{display:none}}
   #load{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#16213e;color:#b2bec3;font-size:14px;z-index:9}
 </style>
 <script type="importmap">
@@ -101,7 +129,8 @@
   <div><h1>Kläranlage Schwierbach · 3D</h1><div class="sub">50.000 EW · Q<sub>TW</sub> 12.000 m³/d<span class="qmax"> · Q<sub>max</sub> 30.000 m³/d</span></div></div>
   <div class="sp"></div>
   <div style="text-align:right"><div id="simClock"></div></div>
-  <button class="btn" id="bPLS" title="Leitwarte Faulung/Gas (Tab)">Leitwarte</button>
+  <button class="btn" id="bMis" title="Missionen starten">🎯<span class="t"> Missionen</span></button>
+  <button class="btn" id="bPLS" title="Leitwarte (Tab)">Leitwarte</button>
   <button class="btn" id="bWalk" title="Anlage in Ich-Perspektive begehen">🚶 Begehen</button>
   <button class="btn" id="bHome" title="Gesamtansicht">⌂<span class="t"> Übersicht</span></button>
 </div>
@@ -109,11 +138,20 @@
 <div id="hint"></div>
 <div id="joy"><div id="knob"></div></div>
 <div id="pls">
-  <h3>Leitwarte · Faulung / Gas <button class="btn" id="plsClose" aria-label="Schließen">×</button></h3>
+  <h3>Leitwarte <span id="plsTabs"><button class="btn on" data-t="faul">Faulung / Gas</button><button class="btn" data-t="bel">Belüftung</button></span><button class="btn" id="plsClose" aria-label="Schließen">×</button></h3>
+  <div id="plsBel" style="display:none">
+    <div id="belVals"></div>
+    <div id="belFP"></div>
+    <canvas id="trendB"></canvas>
+    <div class="leg">Trend 24 h, Skala 0–100 %:<i style="background:#ffd32a"></i>QI 301 (0–5 mg/L)<i style="background:#fdcb6e"></i>QI 311<i style="background:#00d2d3"></i>Luft Str. 1 (0–3.000 Nm³/h)<i style="background:#74b9ff"></i>Luft Str. 2<i style="background:#ff6b6b"></i>P Gebläse (0–200 kW)<i style="background:#a29bfe"></i>NH₄-N (0–5 mg/L)</div>
+    <div id="belAl"></div>
+  </div>
+  <div id="plsFaul">
   <div id="plsVals"></div>
   <canvas id="trend"></canvas>
   <div class="leg">Trend 12 h, Skala 0–100 %:<i style="background:#ffd32a"></i>LI 609<i style="background:#00d2d3"></i>P el (0–125 kW)<i style="background:#ff9f43"></i>Faulgas (0–80 Nm³/h)<i style="background:#a29bfe"></i>CH4 Vol-%<i style="background:#ff6b6b"></i>T FT (20–45 °C)</div>
   <div id="plsAl"></div>
+  </div>
 </div>
 <div id="log"><div style="display:flex;gap:8px;align-items:center;margin-bottom:6px"><b style="flex:1">Protokoll</b><button class="btn" id="logCopy">Kopieren</button><button class="btn" id="logClose">×</button></div><div id="logBody"></div></div>
 <div class="ov" id="detail"><div class="card">
@@ -126,17 +164,24 @@
   <textarea id="meldText"></textarea>
   <div style="display:flex;gap:8px;margin-top:10px;justify-content:flex-end"><button class="btn" id="meldCancel">Abbrechen</button><button class="btn on" id="meldOk">Protokollieren</button></div>
 </div></div>
-<div class="ov" id="szMenu"><div class="card">
-  <h2>Faulung – Szenario</h2>
-  <div class="sub">Die Faulung (Faulturm, Gasspeicher, BHKW, Fackel, Heizwasser) läuft als eigenes, vereinfachtes Prozessmodell. Ein Neustart setzt Zustand und Protokoll zurück.</div>
-  <label for="szSel">Szenario</label>
-  <select id="szSel"><option value="S0">S0</option><option value="S1">S1</option><option value="S2">S2</option></select>
-  <label for="spSel">Zeitraffer</label>
+<div class="ov" id="mis"><div class="card wide">
+  <div style="display:flex;align-items:flex-start;gap:8px"><div style="flex:1"><h2>🎯 Missionen</h2><div class="sub">Vorbereitete Betriebssituationen. Start in der Leitwarte, danach Kontrollgang über die Anlage. Ein Start setzt Simulation und Protokoll zurück.</div></div><button class="btn" id="misClose" aria-label="Schließen">×</button></div>
+  <div id="misList"></div>
+  <div class="misOpt"><label for="spSel">Zeitraffer</label>
   <select id="spSel"><option value="1">×1 (Echtzeit)</option><option value="10">×10</option><option value="60">×60 (1 s = 1 min)</option><option value="120">×120</option></select>
-  <label style="display:flex;gap:8px;align-items:center;color:#dfe6e9"><input type="checkbox" id="szExam"> Erklärtexte in der Detailansicht ausblenden</label>
-  <details><summary>Szenariobeschreibungen (für Lehrkräfte)</summary><div id="szInfo"></div></details>
-  <div style="display:flex;gap:8px;margin-top:14px;justify-content:flex-end"><button class="btn" id="szCancel">Abbrechen</button><button class="btn on" id="szStart">Neu starten</button></div>
+  <label style="display:flex;gap:8px;align-items:center;color:#dfe6e9;margin-top:10px"><input type="checkbox" id="misExam"> Prüfungsmodus: ohne Beschriftungen, Schnellwahl und Erklärtexte</label></div>
 </div></div>
+<div class="ov" id="brief"><div class="card">
+  <div class="sub" id="briefM"></div><h2 id="briefT"></h2>
+  <p id="briefA" class="auftrag"></p>
+  <div style="display:flex;justify-content:flex-end;margin-top:12px"><button class="btn on" id="briefGo">Los geht's ›</button></div>
+</div></div>
+<div class="ov" id="ausw"><div class="card">
+  <div class="sub">Auswertung</div><h2 id="auswT"></h2>
+  <div id="auswBody"></div>
+  <div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end;flex-wrap:wrap"><button class="btn" id="auswCopy">Auswertung + Protokoll kopieren</button><button class="btn" id="auswClose">Weiterspielen</button><button class="btn on" id="auswNeu">Missionen</button></div>
+</div></div>
+<div id="misBar"><span>🎯 <b id="misName"></b> · <span id="misTime">00:00</span></span><button class="btn" id="bAuftrag">Auftrag</button><button class="btn" id="bEnde">Beenden</button></div>
 <div id="toast"></div>
 <div id="info"><button id="close" aria-label="Schließen">×</button><div id="infoBody"></div></div>
 <div id="legend"></div>
@@ -154,7 +199,7 @@
   </div>
   <div id="walkbar">
     <div id="walkSt"></div>
-    <div id="walkTools"><button class="btn" id="bSz">Szenario</button><button class="btn" id="bMeld">Meldung</button><button class="btn" id="bLog">Protokoll</button><span class="hint">W A S D gehen · Ziehen umsehen · E / Klick: Instrument · Tab: Leitwarte</span></div>
+    <div id="walkTools"><button class="btn" id="bMis2">🎯 Missionen</button><button class="btn" id="bMeld">Meldung</button><button class="btn" id="bLog">Protokoll</button><span class="hint">W A S D gehen · Ziehen umsehen · E / Klick: Instrument · Tab: Leitwarte</span></div>
   </div>
 </div>
 <div id="load">3D-Modell wird geladen …</div>
@@ -163,10 +208,13 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { buildFaulung } from './js/faulung-szene.js';
-import { initFaulungUI } from './js/faulung-ui.js';
+import { initAnlageUI } from './js/anlage-ui.js';
+import { buildBelueftung } from './js/belueftung-szene.js';
+import { initMissionen } from './js/missionen.js';
+import { insts, instMeshes, updateInstruments } from './js/instrumente.js';
 import { createWalk } from './js/begehung.js';
-import { simTick } from './js/faulung-sim.js';
-const fui = initFaulungUI();
+import { simTick, sim } from './js/anlage-sim.js';
+const fui = initAnlageUI();
 
 // ------------------------------------------------------------------ Renderer / Szene
 const canvas = document.getElementById('c');
@@ -544,25 +592,17 @@ const bubbles = [];
   }
   { const h = cyl(g, 0.3, 0.3, x1 - 23, M.steel, (23 + x1) / 2, 0, -40); h.rotation.z = Math.PI / 2; h.position.y = top + 0.8; } // Luftsammelleitung
   const lp = cyl(g, 0.3, 0.3, 22, M.steel, xd, top + 0.5, -29); lp.rotation.x = Math.PI / 2; lp.position.y = top + 0.8;
-  reg('bb', g, { name: 'Belebungsbecken', kks: 'Rw1.1 · P4.1 · QI 301',
+  reg('bb', g, { name: 'Belebungsbecken', kks: 'Rw1.1 · P4.1 · QIC 301 / QIC 311',
     text: 'Biologische Stufe mit vorgeschalteter Denitrifikation (anoxisch, gerührt) und Nitrifikation (aerob, feinblasig belüftet). Die interne Rezirkulation P4.1 führt nitrathaltiges Wasser aus der Nitrifikation in die Denitrifikation zurück.',
-    rows: [['Volumen', '10.000 m³, 2 Straßen'], ['Verfahren', 'vorgeschaltete Denitrifikation, V_D/V_BB = 0,40'], ['Belüftung', 'Membranbelüfter, O₂-Sonde QI 301'], ['Regelung', 'Kaskade NH₄ → O₂ → Luftmenge → Gebläse'], ['Rührwerke', 'Rw1.1 Tauchmotorrührwerke, ~4 kW'], ['Rezirkulation', 'P4.1 Axialpumpe, ~2 × Q_ZU, FU']] });
+    rows: [['Volumen', '10.000 m³, 2 Straßen'], ['Verfahren', 'vorgeschaltete Denitrifikation, V_D/V_BB = 0,40'], ['Belüftung', 'Membranbelüfter, O₂-Sonde QI 301'], ['Regelung', 'Kaskade NH₄ → O₂ → Luftmenge → Gebläse'], ['Rührwerke', 'Rw1.1 Tauchmotorrührwerke, ~4 kW'], ['Rezirkulation', 'P4.1 Axialpumpe, ~2 × Q_ZU, FU'], ['Vor Ort', 'O₂-Sonden QI 301 (Nordseite Str. 1) und QI 311 (Südseite Str. 2) an Auslegern']], walk: 'belebung2' });
 }
 // Blaseninstanzen
 const bubbleMesh = new THREE.InstancedMesh(new THREE.CircleGeometry(0.32, 10).rotateX(-Math.PI / 2),
   new THREE.MeshBasicMaterial({ color: 0xefe6d2, transparent: true, opacity: 0.38, depthWrite: false }), bubbles.length);
 scene.add(bubbleMesh);
 
-// Gebläsestation
-{
-  const g = new THREE.Group();
-  building(g, 28, -4, 16, 9, 5, { wall: M.sheet, win: false, doors: [{ s: 's', off: -4, w: 3, h: 3.2 }, { s: 's', off: 4 }] });
-  for (let x = 22; x <= 34; x += 3) ib('win', boxGeo, M.steelDark, x, 3.2, -8.55, 2.2, 1.2, 0.1, 0, false); // Zuluftjalousien
-  box(g, 0.6, 0.6, 10, M.steel, 22.4, 1.3, -13.5, 0, true);
-  reg('geblaese', g, { name: 'Gebläsestation', kks: 'G1.1 / G1.2 · FIC 201',
-    text: 'Erzeugung der Prozessluft für die Nitrifikation. Die Luftmenge wird über die Sauerstoffregelung (Kaskade) vorgegeben und über die Gebläsedrehzahl eingestellt.',
-    rows: [['Aggregate', '2 × Drehkolbengebläse (Aerzen), 1 Betrieb + 1 Reserve'], ['Antrieb', 'FU-geregelt'], ['Messung', 'FIC 201 Luftmenge']] });
-}
+// Gebläsestation, Luftverteilung, Sondenausleger (begehbar, mit Belüftungssimulation) → js/belueftung-szene.js
+const bel = buildBelueftung(scene, { box, cyl, reg, M, std }, { toast: (m) => fui.toast(m) });
 // Fällmittelstation
 {
   const g = new THREE.Group();
@@ -743,7 +783,6 @@ const RSI = { subs: [], pick: [], low: [], roof: null, eq: null, tags: [] };
 }
 // Faulung im Detail (Faulturm, Maschinenhaus, Gasspeicher, Gasstrecke, BHKW, Fackel) → js/faulung-szene.js
 const faul = buildFaulung(scene, { box, cyl, railing, circlePts, reg, M, std }, { toast: (m) => fui.toast(m) });
-fui.setInsts(faul.insts);
 // Schlammentwässerung + Silo
 {
   const g = new THREE.Group();
@@ -822,7 +861,7 @@ function sign(txt, x, y, z, ry = 0, w = 3.4) {
 }
 sign('Zulaufpumpwerk', -118, 4.2, -34.94);
 sign('Rechengebäude', -101, 5.2, -34.44);
-sign('Gebläsestation', 22, 3.6, 0.56);
+sign('Gebläsestation', 29.5, 3.9, 0.7);
 sign('Rücklaufschlammpumpwerk', 77.07, 4.9, -40, Math.PI / 2, 4.2);
 sign('Gerätehaus Schlammbehandlung', -8, 4.4, 45.06, 0, 4.6);
 sign('Schlammentwässerung', -4, 6.2, 70.94, Math.PI, 4.0);
@@ -1004,7 +1043,7 @@ canvas.addEventListener('pointerup', e => {
 });
 
 // ------------------------------------------------------------------ Begehung (Ich-Perspektive) → js/begehung.js
-const walk = createWalk({ scene, camera, canvas, controls, fence: FENCE, getInstMeshes: () => faul.instMeshes, insts: faul.insts,
+const walk = createWalk({ scene, camera, canvas, controls, fence: FENCE, getInstMeshes: () => instMeshes, insts,
   onInspect: (id, msg) => fui.openDetail(id, msg),
   onPickComp: (r) => { const h = r.intersectObjects(pickables, false)[0]; if (!h || h.distance > 60) return null; select(h.object.userData.comp, false); return h.distance; },
   isBlocked: () => fui.isBlocked() });
@@ -1014,6 +1053,7 @@ document.getElementById('bWalk').onclick = e => {
 };
 const _enter = walk.enter;
 walk.enter = (k) => { _enter(k); const b = document.getElementById('bWalk'); b.classList.add('on'); b.textContent = '⬆ Luftbild'; };
+initMissionen({ ui: fui, walk, setExam: (on) => document.body.classList.toggle('exam', on) });
 const _exit = walk.exit;
 walk.exit = () => { _exit(); const b = document.getElementById('bWalk'); b.classList.remove('on'); b.textContent = '🚶 Begehen'; layout(); };
 
@@ -1031,13 +1071,13 @@ const clock = new THREE.Clock(), o3 = new THREE.Object3D(), pv = new THREE.Vecto
 let elapsed = 0;
 function tick() {
   const raw = clock.getDelta(), dt = Math.min(raw, 0.1); elapsed += dt;
-  simTick(raw); faul.update(dt, camera, fui.detail); fui.update(dt);
+  simTick(raw); faul.update(dt); bel.update(dt); updateInstruments(dt, camera, fui.detail); fui.update(dt);
   for (const a of anims) {
     if (a.type === 'rot') a.obj.rotation.y -= a.omega * dt * speed;
     else { a.s = (a.s ?? 0) + a.v * dt * speed; const L = a.b - a.a, ph = a.s % (2 * L); a.obj.position.x = a.a + (ph < L ? ph : 2 * L - ph); }
   }
   bubbles.forEach((b, i) => {
-    const s = 0.25 + 0.95 * Math.pow(Math.abs(Math.sin(elapsed * b[4] + b[3])), 3);
+    const s = (0.25 + 0.95 * Math.pow(Math.abs(Math.sin(elapsed * b[4] + b[3])), 3)) * bel.bubble(b[2]);
     o3.position.set(b[0], b[1], b[2]); o3.scale.set(s, 1, s); o3.updateMatrix(); bubbleMesh.setMatrixAt(i, o3.matrix);
   });
   bubbleMesh.instanceMatrix.needsUpdate = true;
@@ -1068,7 +1108,7 @@ function tick() {
   }
   requestAnimationFrame(tick);
 }
-window.__ka3d = { THREE, scene, renderer, camera, controls, walk, faul };
+window.__ka3d = { THREE, scene, renderer, camera, controls, walk, faul, sim };
 document.getElementById('load').remove();
 tick();
 </script>

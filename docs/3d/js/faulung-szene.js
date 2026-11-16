@@ -1,97 +1,23 @@
 // Faulung im Detail: Faulturm FT-1, Maschinenhaus (begehbar), Gasspeicher GS-1,
 // Gasstrecke mit HA 611 / V6.1, BHKW G10.1 und Gasfackel F6.1 – mit Vor-Ort-Instrumenten,
-// deren Anzeigen live aus dem Prozessmodell (faulung-sim.js) kommen.
+// deren Anzeigen live aus dem Prozessmodell (anlage-sim.js) kommen.
 import * as THREE from 'three';
 import { P, bhkwQuittieren } from './faulung-modell.js';
-import { sim, logA, logSys } from './faulung-sim.js';
-
-const f1 = (x) => x.toFixed(1).replace('.', ','), f0 = (x) => Math.round(x).toLocaleString('de-DE');
-const noise = (amp, k) => amp * Math.sin(performance.now() / 700 + k) * Math.sin(performance.now() / 1900 + 2 * k);
-
-// ------------------------------------------------------------------ Zeichenfunktionen der Instrumente
-function gauge(ctx, W, o) {
-  const H = W, cx = W / 2, cy = H / 2, R = W * 0.47;
-  ctx.fillStyle = '#2b2f33'; ctx.fillRect(0, 0, W, H);
-  ctx.fillStyle = '#fbfbf7'; ctx.beginPath(); ctx.arc(cx, cy, R, 0, 7); ctx.fill();
-  const a0 = Math.PI * 0.75, a1 = Math.PI * 2.25, ang = (v) => a0 + (a1 - a0) * (v - o.min) / (o.max - o.min);
-  ctx.strokeStyle = '#111'; ctx.fillStyle = '#111'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  for (let i = 0; i <= o.ticks * 5; i++) {
-    const v = o.min + (o.max - o.min) * i / (o.ticks * 5), a = ang(v), big = i % 5 === 0;
-    ctx.lineWidth = big ? W * 0.012 : W * 0.006;
-    ctx.beginPath(); ctx.moveTo(cx + Math.cos(a) * R * (big ? 0.78 : 0.84), cy + Math.sin(a) * R * (big ? 0.78 : 0.84)); ctx.lineTo(cx + Math.cos(a) * R * 0.92, cy + Math.sin(a) * R * 0.92); ctx.stroke();
-    if (big) { ctx.font = `bold ${W * 0.07}px Arial`; ctx.fillText(String(Math.round(v)), cx + Math.cos(a) * R * 0.62, cy + Math.sin(a) * R * 0.62); }
-  }
-  ctx.font = `bold ${W * 0.075}px Arial`; ctx.fillText(o.unit, cx, cy + R * 0.42);
-  ctx.font = `${W * 0.06}px Arial`; ctx.fillStyle = '#333'; ctx.fillText(o.tag, cx, cy - R * 0.32);
-  const a = ang(Math.max(o.min - (o.max - o.min) * 0.02, Math.min(o.max * 1.02, o.val)));
-  ctx.strokeStyle = '#000'; ctx.lineWidth = W * 0.02; ctx.lineCap = 'round';
-  ctx.beginPath(); ctx.moveTo(cx - Math.cos(a) * R * 0.12, cy - Math.sin(a) * R * 0.12); ctx.lineTo(cx + Math.cos(a) * R * 0.8, cy + Math.sin(a) * R * 0.8); ctx.stroke();
-  ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(cx, cy, W * 0.04, 0, 7); ctx.fill();
-  const gl = ctx.createLinearGradient(0, 0, W, H); gl.addColorStop(0, 'rgba(255,255,255,0.25)'); gl.addColorStop(0.5, 'rgba(255,255,255,0)');
-  ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(cx, cy, R, 0, 7); ctx.fill();
-}
-function lcd(ctx, W, H, title, lines, o = {}) {
-  ctx.fillStyle = o.frame || '#d0d3d4'; ctx.fillRect(0, 0, W, H);
-  ctx.fillStyle = '#2d3436'; ctx.font = `bold ${W * 0.055}px Arial`; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
-  ctx.fillText(title, W * 0.06, H * 0.04);
-  const x0 = W * 0.06, y0 = H * 0.16, w = W * 0.88, h = H * (o.lcdH || 0.62), fs = o.fs || 0.058;
-  ctx.fillStyle = o.bg || '#0d2310'; ctx.fillRect(x0, y0, w, h);
-  ctx.font = `${W * fs}px monospace`;
-  lines.forEach((l, i) => { ctx.fillStyle = typeof l === 'object' ? l.c : (o.fg || '#7CFC9a'); ctx.fillText(typeof l === 'object' ? l.t : l, x0 + w * 0.04, y0 + h * 0.06 + i * W * fs * 1.35); });
-}
-function lamp(ctx, x, y, r, col, on, label, W) {
-  ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(x, y, r * 1.2, 0, 7); ctx.fill();
-  ctx.fillStyle = on ? col : '#3a3a3a'; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
-  if (on) { ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.beginPath(); ctx.arc(x - r * 0.3, y - r * 0.3, r * 0.35, 0, 7); ctx.fill(); }
-  ctx.fillStyle = '#2d3436'; ctx.font = `${W * 0.045}px Arial`; ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillText(label, x, y + r * 1.5);
-}
-function plate(text, bg = '#ecf0f1') {
-  return (ctx, W, H) => { ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H); ctx.fillStyle = '#111'; ctx.font = `bold ${W * 0.2}px Arial`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(text, W / 2, H / 2); };
-}
-function senses(ctx, W, H, title, lines, on) {
-  ctx.fillStyle = '#1e272e'; ctx.fillRect(0, 0, W, H);
-  ctx.fillStyle = on ? '#00b894' : '#636e72'; ctx.beginPath(); ctx.arc(W * 0.12, H * 0.16, W * 0.04, 0, 7); ctx.fill();
-  ctx.fillStyle = '#ffeaa7'; ctx.font = `bold ${W * 0.06}px Arial`; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(title, W * 0.2, H * 0.16);
-  ctx.fillStyle = '#dfe6e9'; ctx.font = `${W * 0.052}px Arial`;
-  ctx.fillText('Sinneseindruck vor Ort:', W * 0.08, H * 0.34);
-  lines.forEach((l, i) => ctx.fillText(l, W * 0.08, H * 0.48 + i * H * 0.11));
-}
+import { sim, logA, logSys } from './anlage-sim.js';
+import { f1, f0, noise, gauge, lcd, lamp, plate, senses, insts, instMeshes, makeInstFactory, pipeFactory } from './instrumente.js';
 
 // ------------------------------------------------------------------ Aufbau
 // h = Hilfsfunktionen aus index.html: { box, cyl, railing, circlePts, reg, M, std }
 export function buildFaulung(scene, h, hooks = {}) {
   const { box, cyl, railing, circlePts, reg, M, std } = h;
   const toast = hooks.toast || (() => {});
-  const insts = {}, instMeshes = [], anim = {};
+  const anim = {};
   const noCol = (o) => { o.traverse((m) => { m.userData.noCol = true; }); return o; };
 
-  const pipe = (g, pts, r, mat) => {
-    for (let i = 0; i < pts.length - 1; i++) {
-      const a = new THREE.Vector3(...pts[i]), b = new THREE.Vector3(...pts[i + 1]);
-      const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, a.distanceTo(b), 12), mat);
-      m.position.copy(a).add(b).multiplyScalar(0.5);
-      m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), b.clone().sub(a).normalize());
-      m.castShadow = true; m.userData.noCol = true; g.add(m);
-      const k = new THREE.Mesh(new THREE.SphereGeometry(r * 1.05, 10, 8), mat); k.position.copy(b); k.userData.noCol = true; g.add(k);
-    }
-  };
+  const pipe = pipeFactory();
   const stuetze = (g, x, z, y) => noCol(box(g, 0.12, y, 0.12, M.steelDark, x, 0, z, 0, false));
 
-  function makeInst(id, def) {
-    const S = def.res || 256, cv = document.createElement('canvas');
-    cv.width = S; cv.height = Math.round(S * (def.aspect || 1));
-    const ctx = cv.getContext('2d'), tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
-    const geo = def.round ? new THREE.CircleGeometry(def.size / 2, 40) : new THREE.PlaneGeometry(def.size, def.size * (def.aspect || 1));
-    const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: tex, toneMapped: false }));
-    mesh.position.set(...def.pos); mesh.rotation.y = def.rotY || 0; mesh.userData.inst = id; mesh.userData.noCol = true;
-    scene.add(mesh); instMeshes.push(mesh);
-    if (def.round) {
-      const hs = new THREE.Mesh(new THREE.CylinderGeometry(def.size / 2 + 0.02, def.size / 2 + 0.02, 0.06, 32), M.steelDark);
-      hs.rotation.order = 'YXZ'; hs.rotation.set(Math.PI / 2, def.rotY || 0, 0); hs.userData.noCol = true;
-      hs.position.copy(mesh.position).add(new THREE.Vector3(0, 0, -0.035).applyAxisAngle(new THREE.Vector3(0, 1, 0), def.rotY || 0)); scene.add(hs);
-    }
-    insts[id] = { ...def, id, cv, ctx, tex, mesh, pos: new THREE.Vector3(...def.pos) };
-  }
+  const makeInst = makeInstFactory(scene, M);
 
   // ================================================================ Faulturm FT-1 + Maschinenhaus
   const FT = { x: 28, z: 45 };
@@ -347,8 +273,7 @@ export function buildFaulung(scene, h, hooks = {}) {
     const m = new THREE.Mesh(puffGeo, new THREE.MeshBasicMaterial({ color: warm ? 0xffd8a8 : 0xdfe6e9, transparent: true, opacity: warm ? 0.18 : 0.35, depthWrite: false }));
     m.position.set(x, y, z); m.userData = { age: 0, warm, noCol: true }; scene.add(m); smoke.push(m);
   };
-  let texT = 0;
-  function update(dt, camera, detailCtx) {
+  function update(dt) {
     const S = sim.S;
     anim.valve.rotation.y += ((S.ha611 ? 0 : Math.PI / 2) - anim.valve.rotation.y) * Math.min(1, dt * 6);
     if (S.verd) anim.fan.rotation.z += dt * 40;
@@ -362,16 +287,6 @@ export function buildFaulung(scene, h, hooks = {}) {
       m.scale.setScalar(1 + m.userData.age * 1.2); m.material.opacity = Math.max(0, (m.userData.warm ? 0.18 : 0.35) * (1 - m.userData.age / 4));
       if (m.userData.age > 4) { scene.remove(m); m.material.dispose(); smoke.splice(i, 1); }
     }
-    texT -= dt;
-    if (texT <= 0) {
-      texT = 0.25;
-      for (const id in insts) {
-        const it = insts[id];
-        if (it.drawn && it.pos.distanceTo(camera.position) > 30) continue;
-        it.draw(it.ctx, it.cv.width, it.cv.height); it.tex.needsUpdate = true; it.drawn = true;
-      }
-      if (detailCtx && detailCtx.id) { const it = insts[detailCtx.id]; (it.detail || it.draw)(detailCtx.ctx, detailCtx.ctx.canvas.width, detailCtx.ctx.canvas.height); }
-    }
   }
-  return { insts, instMeshes, update };
+  return { update };
 }
