@@ -34,6 +34,7 @@
   #labels{position:fixed;inset:0;pointer-events:none;overflow:hidden}
   .lbl{position:absolute;left:0;top:0;transform:translate(-50%,-100%);background:#16213ed9;border:1px solid #2d4a7a;color:#fff;
        font-size:10.5px;padding:2px 5px;border-radius:4px;white-space:nowrap;pointer-events:auto;cursor:pointer;font-family:monospace}
+  .tag{position:absolute;left:0;top:0;background:#ffffffd9;color:#16213e;font-size:9.5px;padding:1px 4px;border-radius:3px;white-space:nowrap;pointer-events:none;font-family:Arial,Helvetica,sans-serif}
   .lbl.sel{background:#ffd54a;color:#16213e;border-color:#ffd54a;font-weight:bold}
   #legend{position:fixed;right:8px;display:none;background:#16213ee6;border:1px solid #2d4a7a;border-radius:8px;padding:6px 8px;font-size:11px;line-height:1.55}
   #legend i{display:inline-block;width:16px;height:4px;border-radius:2px;margin-right:6px;vertical-align:middle}
@@ -150,6 +151,11 @@ function cyl(parent, rt, rb, h, mat, x, y, z, seg = 32, open = false) {
   m.castShadow = true; m.receiveShadow = true; parent.add(m); return m;
 }
 // Instanz-Sammler (Geländer, Fenster, Pfosten …)
+function beam(parent, p0, p1, w, h, mat) {
+  const a = new THREE.Vector3(...p0), b = new THREE.Vector3(...p1), d = b.clone().sub(a), L = d.length();
+  const m = new THREE.Mesh(boxGeo, mat); m.scale.set(L, h, w); m.position.copy(a).add(b).multiplyScalar(0.5);
+  m.quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), d.normalize()); m.castShadow = m.receiveShadow = true; parent.add(m); return m;
+}
 const inst = {};
 function ib(key, geo, mat, x, y, z, sx, sy, sz, ry = 0, cast = true) {
   (inst[key] ||= { geo, mat, cast, list: [] }).list.push([x, y, z, sx, sy, sz, ry]);
@@ -377,6 +383,35 @@ for (let x = -122; x <= -102; x += 2.8) for (const z of [22.2, 49.8]) ib('mark',
     text: 'Absetzbecken zur Abscheidung absetzbarer organischer Stoffe. Der Primärschlamm wird vom Schildräumer in den Schlammtrichter geschoben und über P6.1 zum Voreindicker gefördert.',
     rows: [['Bauform', '2 Rundbecken, Halbbrückenräumer'], ['Durchmesser', '≈ 18 m *'], ['Primärschlamm', 'P6.1 Exzenterschneckenpumpe, drehzahlgeregelt'], ['Messung', 'QI 105 Trübung/AFS Ablauf VK']], note: true });
 }
+// Ausgleichsbecken AB-1 mit Beschickungspumpe P2.1
+{
+  const g = new THREE.Group(), cx = -8, cz = -40, r = 6.3, top = 4.6, wl = 3.0, V2 = THREE.Vector2;
+  const wall = new THREE.Mesh(new THREE.LatheGeometry([new V2(r, -0.5), new V2(r + 0.35, -0.5), new V2(r + 0.35, top), new V2(r, top), new V2(r, -0.5)], 64), M.concrete);
+  wall.position.set(cx, 0, cz); wall.castShadow = wall.receiveShadow = true; g.add(wall);
+  const w = new THREE.Mesh(new THREE.CircleGeometry(r, 64).rotateX(-Math.PI / 2), waterMat(0x6a6550, 2)); w.position.set(cx, wl, cz); g.add(w);
+  railing(circlePts(cx, cz, r + 0.17, 40), top);
+  // Treppe + Podest (West)
+  const tx = cx - r - 2.2;
+  for (const [dx, dz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) box(g, 0.12, top, 0.12, M.steelDark, tx + dx, 0, cz + 3 + dz);
+  box(g, 2.2, 0.1, 2.2, M.grating, tx, top, cz + 3); box(g, 1.6, 0.1, 1.0, M.grating, tx + 1.6, top, cz + 3);
+  beam(g, [tx, 0.1, cz - 1.6], [tx, top, cz + 1.9], 1.0, 0.12, M.grating);
+  railing([[tx - 1.1, cz + 4.1], [tx + 1.1, cz + 4.1]], top); railing([[tx - 0.55, cz - 1.6], [tx - 0.55, cz + 1.9]], 0.1, 1.0);
+  // LIC 203 – Ultraschallsonde am Ausleger
+  box(g, 2.0, 0.12, 0.12, M.galv, cx + r - 0.6, top + 0.5, cz); box(g, 0.12, 0.6, 0.12, M.galv, cx + r + 0.2, top, cz);
+  const so = cyl(g, 0.14, 0.14, 0.3, std(0x2c3e50), cx + r - 1.5, top + 0.2, cz, 16);
+  box(g, 0.3, 0.35, 0.18, std(0xd9c27a), cx + r + 0.6, top - 1.2, cz, 0, false);
+  // P2.1 – Pumpenschacht mit Davit, Druckleitung über die Beckenwand
+  box(g, 2.8, 0.5, 2.8, M.concrete, -17.2, 0, cz);
+  box(g, 1.2, 0.08, 1.0, M.steelDark, -17.4, 0.5, cz); box(g, 0.9, 0.08, 0.8, M.steelDark, -16.4, 0.5, cz + 0.6);
+  box(g, 0.14, 2.6, 0.14, M.galv, -18.3, 0.5, cz - 1.1); box(g, 1.3, 0.12, 0.12, M.galv, -17.7, 3.0, cz - 1.1);
+  const pp = (a, b2) => beam(g, a, b2, 0.32, 0.32, M.steel);
+  pp([-16.2, 0.5, cz - 0.6], [-16.2, top + 0.7, cz - 0.6]); pp([-16.2, top + 0.7, cz - 0.6], [cx - r + 1.2, top + 0.7, cz - 0.6]); pp([cx - r + 1.2, top + 0.7, cz - 0.6], [cx - r + 1.2, wl + 0.6, cz - 0.6]);
+  box(g, 0.5, 0.9, 0.35, std(0xd9c27a), -19.3, 0, cz + 1.2);
+  reg('ab', g, { name: 'Ausgleichsbecken AB-1', kks: 'P2.1 · LIC 203',
+    text: 'Puffert den Ablauf der Vorklärung vor der Belebung. Die drehzahlgeregelte Beschickungspumpe P2.1 hält den Füllstand über den PI-Regler LIC 203 konstant. Da der Bodenablauf zur Belebung vom Wasserstand abhängt, sorgt ein konstanter Füllstand für eine gleichmäßige Beschickung der Belebung und schützt die Nachklärung vor hydraulischer Überlastung.',
+    rows: [['Bauform', 'Rundbecken, D = 12,6 m'], ['Füllstand', 'Sollwert 3,0 m, LIC 203 (PI-Regler)'], ['Beschickung', 'P2.1 Tauchmotorpumpe (KP), FU, ~500 m³/h'], ['Ablauf', 'Bodenablauf zur Belebung (Freigefälle)'], ['Wandhöhe', '≈ 4,6 m *']], note: true,
+    link: ['https://mein-hsbk.github.io/Fuellstandsregelung/', 'Simulation Füllstandsregelung öffnen ▸'] });
+}
 // Mischwasserabschlag
 {
   const g = new THREE.Group();
@@ -457,7 +492,7 @@ scene.add(bubbleMesh);
     rows: [['Bauform', '2 Rundbecken, Halbbrückenräumer, zentraler Einlauf'], ['Durchmesser', '≈ 32 m *'], ['Messung', 'LI 401 Schlammspiegel']], note: true });
 }
 // Rücklaufschlammpumpwerk – mit Innenansicht (Dach abnehmbar)
-const RSI = { subs: [], pick: [], low: [], roof: null, eq: null };
+const RSI = { subs: [], pick: [], low: [], roof: null, eq: null, tags: [] };
 {
   const g = new THREE.Group(), cx = 72, cz = -40, W = 10, D = 20, Hh = 6.2, t = 0.3;
   box(g, W, 0.12, D, M.concreteDark, cx, 0, cz, 0, false);
@@ -493,7 +528,7 @@ const RSI = { subs: [], pick: [], low: [], roof: null, eq: null };
     comps[id] = { id, group: grp, ...info, sub: true, short: label, center: new THREE.Vector3(c.x, 0, c.z), anchor: anchor || new THREE.Vector3(c.x, b.max.y + 0.35, c.z), radius: Math.max(s.x, s.z) / 2 };
     RSI.subs.push(id);
   };
-  const yS = 0.45, xP = cx + 0.4, xSS = cx + 3.4, xDS = cx - 3.6, yD = 2.4;
+  const yS = 0.75, xP = cx + 0.4, xSS = cx + 3.4, xDS = cx - 3.6, yD = 2.4;
   // Saug- und Drucksammler
   pipe(eq, [xSS, yS, cz - 9.6], [xSS, yS, cz + 8.0], 0.17);
   for (const z of [cz - 9.0, cz + 7.4]) pipe(eq, [xSS, yS, z], [cx + W / 2 + 0.6, yS, z], 0.17);
@@ -511,38 +546,46 @@ const RSI = { subs: [], pick: [], low: [], roof: null, eq: null };
       text: 'Magnetisch-induktiver Durchflussmesser im Drucksammler. Er misst den gesamten Rücklaufschlammstrom und liefert den Istwert für die Stufenschaltung.',
       rows: [['Messprinzip', 'MID (magnetisch-induktiv)'], ['Einbauort', 'Drucksammler, vor Abgang zur Belebung'], ['Verwendung', 'Istwert RS-Strom → Stufenschaltung']] });
   }
-  // Pumpen P3.1–P3.6
-  const RUN = [true, true, true, true, false, false];
+  // Pumpen P3.1–P3.6 (horizontale Welle, trocken aufgestellt)
+  const RUN = [true, true, true, true, false, false], sh = yS, yH = 1.75;
+  const guardM = new THREE.MeshStandardMaterial({ color: 0xe0a020, transparent: true, opacity: 0.4, roughness: 0.6 }), midM = std(0x3d5a73, { r: .5, m: .3 });
   for (let i = 0; i < 6; i++) {
     const z = cz - 6.0 + i * 2.5, p = new THREE.Group(), id = `rs_p3${i + 1}`;
-    box(p, 1.1, 0.12, 1.0, M.steelDark, xP, 0.12, z);                                            // Grundrahmen
-    cyl(p, 0.42, 0.44, 0.42, ksb, xP, 0.24, z, 28);                                              // Spiralgehäuse
-    pipe(p, [xP + 0.3, yS, z], [xSS - 0.1, yS, z], 0.085);                                       // Saugleitung DN 125
-    flange(p, [xP + 0.5, yS, z], 0, 0.13); valve(p, cx + 2.3, yS, z); gauge(p, cx + 1.7, yS + 0.08, z);
-    pipe(p, [xP - 0.3, yS, z], [cx - 2.9, yS, z], 0.07);                                         // Druckleitung DN 100
-    flange(p, [xP - 0.5, yS, z], 0, 0.12); gauge(p, xP - 0.75, yS + 0.06, z);
-    pipe(p, [cx - 0.75, yS, z], [cx - 0.35, yS, z], 0.12, std(0x3d5a73, { r: .5, m: .3 }));     // FI 41x
-    box(p, 0.15, 0.2, 0.18, std(0x2c3e50), cx - 0.55, yS + 0.1, z, 0, false);
-    box(p, 0.32, 0.3, 0.28, M.steelDark, cx - 1.5, yS - 0.15, z);                                // Rückschlagklappe
-    box(p, 0.08, 0.08, 0.3, M.steel, cx - 1.42, yS + 0.18, z + 0.18, 0, false);
-    valve(p, cx - 2.25, yS, z);
-    pipe(p, [cx - 2.9, yS, z], [cx - 2.9, yD, z], 0.07); pipe(p, [cx - 2.9, yD, z], [xDS, yD, z], 0.07);
-    for (const [dx, dz] of [[-.2, -.2], [.2, -.2], [.2, .2], [-.2, .2]]) box(p, 0.05, 0.45, 0.05, ksb, xP + dx, 0.66, z + dz, 0, false); // Laterne
-    const cpl = new THREE.Group(); cpl.position.set(xP, 0.88, z); p.add(cpl);
-    const cm = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.28, 14), M.steel); cpl.add(cm);
-    const mk = new THREE.Mesh(boxGeo, std(0xe6c229)); mk.scale.set(0.05, 0.26, 0.04); mk.position.set(0.12, 0, 0); cpl.add(mk);
+    box(p, 3.4, 0.14, 0.75, M.steelDark, cx - 0.05, 0.12, z);                                   // Grundrahmen
+    pipe(p, [cx + 0.86, sh, z], [cx + 1.26, sh, z], 0.44, ksb);                                  // Spiralgehäuse
+    box(p, 0.4, sh - 0.26, 0.5, ksb, cx + 1.06, 0.26, z, 0, false);                              // Gehäusefuß
+    pipe(p, [cx + 1.26, sh, z], [cx + 1.5, sh, z], 0.11, ksb); flange(p, [cx + 1.52, sh, z], 0, 0.16);
+    pipe(p, [cx + 1.55, sh, z], [xSS - 0.1, sh, z], 0.085);                                    // Saugleitung DN 125
+    valve(p, cx + 2.55, sh, z); gauge(p, cx + 1.95, sh + 0.08, z);
+    pipe(p, [cx + 0.86, sh, z], [cx + 0.34, sh, z], 0.17, ksb);                                  // Lagerträger
+    box(p, 0.3, sh - 0.26 - 0.17, 0.4, ksb, cx + 0.55, 0.26, z, 0, false);
+    const cpl = new THREE.Group(); cpl.position.set(cx + 0.12, sh, z); p.add(cpl);              // Kupplung
+    const cm = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.24, 14), M.steel); cm.rotation.z = Math.PI / 2; cpl.add(cm);
+    const mk = new THREE.Mesh(boxGeo, std(0xe6c229)); mk.scale.set(0.22, 0.04, 0.05); mk.position.set(0, 0.12, 0); cpl.add(mk);
     if (RUN[i]) spinRS.push(cpl);
-    cyl(p, 0.24, 0.24, 0.06, ksb, xP, 1.08, z, 20);
-    cyl(p, 0.31, 0.31, 0.68, mot, xP, 1.14, z, 24);                                              // Motor 7,5 kW
-    cyl(p, 0.29, 0.29, 0.14, M.steelDark, xP, 1.82, z, 24);                                      // Lüfterhaube
-    box(p, 0.2, 0.18, 0.22, mot, xP - 0.38, 1.5, z, 0, false);                                   // Klemmenkasten
-    box(p, 0.02, 0.12, 0.2, M.galv, xP + 0.32, 1.42, z, 0, false);                               // Typenschild
-    box(p, 0.08, 1.15, 0.08, M.steelDark, cx + 1.25, 0, z + 0.65, 0, false);                     // Vor-Ort-Steuerstelle
-    box(p, 0.28, 0.36, 0.18, std(0xd9c27a), cx + 1.25, 1.15, z + 0.65, 0, false);
-    const lmp = new THREE.Mesh(new THREE.SphereGeometry(0.05, 10, 8), RUN[i] ? lampOn : lampOff); lmp.position.set(cx + 1.25, 1.42, z + 0.75); p.add(lmp);
-    subReg(id, p, `P3.${i + 1}`, null, { name: `Rücklaufschlammpumpe P3.${i + 1}`, kks: `P3.${i + 1} · FI 41${i + 1} · PI 42${i + 1} / PI 43${i + 1}`,
-      text: 'Trocken aufgestellte Freistromradpumpe mit Laterne und aufgesetztem Normmotor. Saugseitig Absperrschieber, druckseitig Durchflussmessung, Rückschlagklappe und Absperrschieber; Manometer vor und hinter der Pumpe.',
+    const gd = new THREE.Mesh(boxGeo, guardM); gd.scale.set(0.42, 0.38, 0.38); gd.position.set(cx + 0.12, sh, z); p.add(gd); // Kupplungsschutz
+    pipe(p, [cx - 0.1, sh, z], [cx - 0.88, sh, z], 0.3, mot);                                    // Motor 7,5 kW
+    pipe(p, [cx - 0.88, sh, z], [cx - 1.04, sh, z], 0.28, M.steelDark);                          // Lüfterhaube
+    box(p, 0.6, sh - 0.3 - 0.26, 0.5, mot, cx - 0.5, 0.26, z, 0, false);                         // Motorfüße
+    box(p, 0.22, 0.18, 0.22, mot, cx - 0.42, sh + 0.28, z, 0, false);                            // Klemmenkasten
+    box(p, 0.2, 0.12, 0.02, M.galv, cx - 0.55, sh - 0.06, z + 0.31, 0, false);                   // Typenschild
+    pipe(p, [cx + 1.06, sh + 0.4, z], [cx + 1.06, yH, z], 0.07); flange(p, [cx + 1.06, sh + 0.5, z], 1, 0.12); // Druckstutzen
+    pipe(p, [cx + 1.06, yH, z], [cx - 2.9, yH, z], 0.07);                                        // Druckleitung DN 100
+    gauge(p, cx + 0.8, yH + 0.06, z);
+    pipe(p, [cx + 0.15, yH, z], [cx + 0.55, yH, z], 0.12, midM); box(p, 0.15, 0.2, 0.18, std(0x2c3e50), cx + 0.35, yH + 0.1, z, 0, false); // FI 41x
+    box(p, 0.32, 0.3, 0.28, M.steelDark, cx - 0.7, yH - 0.15, z); box(p, 0.08, 0.08, 0.3, M.steel, cx - 0.62, yH + 0.18, z + 0.18, 0, false); // RSK
+    valve(p, cx - 1.6, yH, z);
+    pipe(p, [cx - 2.9, yH, z], [cx - 2.9, yD, z], 0.07); pipe(p, [cx - 2.9, yD, z], [xDS, yD, z], 0.07);
+    box(p, 0.08, 1.15, 0.08, M.steelDark, cx + 2.05, 0, z + 0.95, 0, false);                     // Vor-Ort-Steuerstelle
+    box(p, 0.28, 0.36, 0.18, std(0xd9c27a), cx + 2.05, 1.15, z + 0.95, 0, false);
+    const lmp = new THREE.Mesh(new THREE.SphereGeometry(0.05, 10, 8), RUN[i] ? lampOn : lampOff); lmp.position.set(cx + 2.05, 1.42, z + 1.05); p.add(lmp);
+    subReg(id, p, `P3.${i + 1}`, new THREE.Vector3(cx - 1.35, 0.9, z), { name: `Rücklaufschlammpumpe P3.${i + 1}`, kks: `P3.${i + 1} · FI 41${i + 1} · PI 42${i + 1} / PI 43${i + 1}`,
+      text: 'Trocken aufgestellte Freistromradpumpe mit horizontaler Welle, Lagerträger, Kupplung und Normmotor auf gemeinsamem Grundrahmen. Saugseitig Absperrschieber, druckseitig Durchflussmessung, Rückschlagklappe und Absperrschieber; Manometer vor und hinter der Pumpe.',
       rows: [['Pumpe', 'KSB Sewabloc F 100-252, Laufrad ø235'], ['Auslegung', '95 m³/h bei 11,2 m · Betrieb ~80 m³/h bei ~12 m'], ['Motor', 'VEM K21R 132 M4, 7,5 kW, 1455 1/min, IE3'], ['Anlauf', 'Stern-Dreieck, Festdrehzahl'], ['Anschlüsse', 'DN 125 saug / DN 100 druck'], ['Im Bild', RUN[i] ? 'in Betrieb (Beispielzustand)' : 'Bereitschaft (Beispielzustand)']] });
+    if (i === 5) RSI.tags = [
+      ['Absperrschieber', cx + 2.55, sh + 1.0, z], ['Manometer', cx + 1.95, sh + 0.42, z], ['Motor', cx - 0.5, sh + 0.35, z + 0.3],
+      ['Manometer', cx + 0.8, yH + 0.5, z], ['Durchflussmesser', cx + 0.35, yH + 1.05, z], ['Rückschlagklappe', cx - 0.7, yH + 0.3, z + 0.2],
+      ['Absperrschieber', cx - 1.6, yH + 0.85, z]].map(([t, x, y, zz]) => ({ t, v: new THREE.Vector3(x, y, zz) }));
   }
   // P5.1 – Exzenterschneckenpumpe Überschussschlamm
   {
@@ -557,7 +600,7 @@ const RSI = { subs: [], pick: [], low: [], roof: null, eq: null };
     pipe(f, [xSS, yS, z], [xSS - 0.4, yS, z], 0.1); pipe(f, [xSS - 0.4, yS, z], [xSS - 0.4, 1.6, z], 0.1);
     pipe(f, [xSS - 0.4, 1.6, z], [cx - 0.5, 1.6, z], 0.1); pipe(f, [cx - 0.5, 1.6, z], [cx - 0.5, 0.76, z], 0.1);
     pipe(f, [cx + 1.5, 0.7, z], [cx + 1.5, 2.9, z], 0.08); pipe(f, [cx + 1.5, 2.9, z], [cx + 1.5, 2.9, cz - D / 2 - 0.6], 0.08);
-    subReg('rs_p51', f, 'P5.1', null, { name: 'Überschussschlammpumpe P5.1', kks: 'P5.1',
+    subReg('rs_p51', f, 'P5.1', new THREE.Vector3(cx - 0.5, 1.1, cz - 8.7), { name: 'Überschussschlammpumpe P5.1', kks: 'P5.1',
       text: 'Exzenterschneckenpumpe zum Abzug des Überschussschlamms. Die Fördermenge wird über die Drehzahl eingestellt; der Schlamm wird zum Voreindicker VE-1 gefördert.',
       rows: [['Pumpe', 'Seepex BN 52-6L (Exzenterschnecke)'], ['Antrieb', 'Getriebemotor, drehzahlgeregelt (FU)'], ['Ziel', 'Voreindicker VE-1']] });
   }
@@ -580,7 +623,7 @@ const RSI = { subs: [], pick: [], low: [], roof: null, eq: null };
     box(f, 0.5, 0.35, 0.6, std(0xd9a62a, { r: .5, m: .3 }), xP, 4.95, cz - 1.2);
     box(f, 0.03, 1.6, 0.03, M.steelDark, xP, 3.35, cz - 1.2, 0, false);
     const hk = new THREE.Mesh(new THREE.TorusGeometry(0.08, 0.025, 6, 12, Math.PI * 1.4), M.steelDark); hk.position.set(xP, 3.3, cz - 1.2); f.add(hk);
-    subReg('rs_kran', f, 'Kran', new THREE.Vector3(xP, 6.0, cz + 6), { name: 'Laufkatze / Hebezeug', kks: 'Kranbahn über Pumpenreihe',
+    subReg('rs_kran', f, 'Kran', new THREE.Vector3(xP, 5.9, cz - 9.6), { name: 'Laufkatze / Hebezeug', kks: 'Kranbahn über Pumpenreihe',
       text: 'Elektrokettenzug auf einer Kranbahn über der Pumpenreihe. Motor und Laufradeinheit können zur Wartung angehoben und ausgebaut werden, ohne die Rohrleitungen zu demontieren (Back-Pull-Out).',
       rows: [['Einsatz', 'Wartung, Laufrad-/Motortausch'], ['Hinweis', 'Prüfung nach DGUV Vorschrift 52/54']] });
   }
@@ -740,26 +783,87 @@ const RSI = { subs: [], pick: [], low: [], roof: null, eq: null };
   });
   crown.castShadow = trunk.castShadow = true; scene.add(crown, trunk);
 }
+
+// ------------------------------------------------------------------ Außendetails
+function sign(txt, x, y, z, ry = 0, w = 3.4) {
+  const cv = document.createElement('canvas'); cv.width = 512; cv.height = 80; const c = cv.getContext('2d');
+  c.fillStyle = '#f4f4f0'; c.fillRect(0, 0, 512, 80); c.strokeStyle = '#2b3a4a'; c.lineWidth = 6; c.strokeRect(3, 3, 506, 74);
+  c.fillStyle = '#2b3a4a'; c.font = 'bold 40px Arial'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(txt, 256, 42);
+  const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace;
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, w * 80 / 512), new THREE.MeshStandardMaterial({ map: t, roughness: .6 }));
+  m.position.set(x, y, z); m.rotation.y = ry; scene.add(m);
+}
+sign('Zulaufpumpwerk', -118, 4.2, -34.94);
+sign('Rechengebäude', -101, 5.2, -34.44);
+sign('Gebläsestation', 22, 3.6, 0.56);
+sign('Rücklaufschlammpumpwerk', 77.07, 4.9, -40, Math.PI / 2, 4.2);
+sign('Gerätehaus Schlammbehandlung', -8, 4.4, 45.06, 0, 4.6);
+sign('Schlammentwässerung', -4, 6.2, 70.94, Math.PI, 4.0);
+sign('Faulung', 33.56, 3.4, 58.5, Math.PI / 2, 2.6);
+// Beckengeländer
+railing([[0, -62], [56, -62], [56, -18], [0, -18], [0, -62]], 1.0);
+railing([[-84, -45.5], [-56, -45.5], [-56, -34.5], [-84, -34.5], [-84, -45.5]], 0.8);
+railing([[-48.5, -42.5], [-43.5, -42.5], [-43.5, -37.5], [-48.5, -37.5], [-48.5, -42.5]], 0.8);
+// Mastleuchten entlang der Betriebsstraßen
+{
+  const pts = [];
+  for (let x = -120; x <= 130; x += 32) pts.push([x, -91, 0], [x + 16, 15.5, Math.PI], [x, 65, Math.PI]);
+  for (let z = -70; z <= 50; z += 30) pts.push([-136, z, Math.PI / 2], [144, z, -Math.PI / 2]);
+  for (const [x, z, ry] of pts) {
+    ib('lpole', cylGeo, M.galv, x, 4, z, 0.16, 8, 0.16, 0);
+    const dx = Math.sin(ry) * 0.8, dz = Math.cos(ry) * 0.8;
+    ib('larm', boxGeo, M.galv, x + dx * 0.5, 7.9, z + dz * 0.5, 0.08 + Math.abs(dx), 0.08, 0.08 + Math.abs(dz), 0, false);
+    ib('lhead', boxGeo, M.steelDark, x + dx, 7.85, z + dz, 0.5, 0.14, 0.5, 0, false);
+  }
+}
+// Hydranten
+for (const [x, z] of [[-110, 16], [-30, 16], [50, 16], [120, 16], [-60, 66], [40, 66], [-60, -91], [60, -91]]) {
+  ib('hyd', cylGeo, std(0xc0392b, { r: .5 }), x, 0.45, z, 0.3, 0.9, 0.3, 0);
+  ib('hydc', boxGeo, std(0xc0392b, { r: .5 }), x, 0.65, z, 0.5, 0.14, 0.14, 0, false);
+}
+// Trafostation + Netzersatzanlage
+{
+  const g = scene;
+  box(g, 6, 2.8, 3, std(0x6f8a6a, { r: .7 }), -52, 0, 40); box(g, 6.4, 0.2, 3.4, std(0x5b6f57), -52, 2.8, 40);
+  for (const x of [-54, -50]) box(g, 1.2, 2.1, 0.06, M.door, x, 0, 41.53, 0, false);
+  box(g, 6.1, 2.6, 2.5, M.sheet, -52, 0, 31); cyl(g, 0.15, 0.15, 1.2, M.steel, -50, 2.6, 31, 10);
+  for (let x = -54.5; x <= -50; x += 1.5) box(g, 1.0, 1.2, 0.05, M.steelDark, x, 0.9, 32.27, 0, false);
+  sign('Trafostation', -52, 2.2, 41.57, 0, 2.2); sign('Netzersatzanlage', -52, 2.05, 32.3, 0, 2.6);
+}
+// Probenehmer Zulauf, Dienstfahrzeug, Container
+box(scene, 0.9, 1.6, 0.7, std(0xd5d8db, { r: .6, m: .2 }), -111.3, 0, -46.5);
+box(scene, 5.6, 2.1, 2.1, M.plaster, -71, 0.4, 66.5); box(scene, 1.4, 1.1, 2.0, M.window, -73.3, 1.4, 66.5, 0, false);
+for (const x of [-72.8, -69.2]) for (const z of [65.5, 67.5]) { const w = cyl(scene, 0.38, 0.38, 0.25, M.rubber, x, 0, z, 12); w.rotation.x = Math.PI / 2; w.position.y = 0.38; }
+box(scene, 6.5, 1.6, 2.5, std(0x8a3324, { r: .6, m: .3 }), -112, 0, 20);
 flushInst();
 
 // ------------------------------------------------------------------ Fließwege (Overlay)
 const FLOW = {
-  aw: { n: 'Abwasser', c: 0xa6814f, y: 2.2, p: [[[-160, -40], [-46, -40]], [[-46, -40], [-46, -58], [-37, -58]], [[-46, -40], [-46, -22], [-37, -22]], [[-19, -58], [-6, -58], [-6, -52], [0, -52]], [[-19, -22], [-6, -22], [-6, -28], [0, -28]], [[56, -52], [80, -52], [80, -62], [102, -62]], [[56, -28], [80, -28], [80, -18], [102, -18]]] },
+  aw: { n: 'Abwasser', c: 0xa6814f, y: 2.2, p: [[[-160, -40], [-46, -40]], [[-46, -40], [-46, -58], [-37, -58]], [[-46, -40], [-46, -22], [-37, -22]], [[-19, -58], [-16.5, -58], [-16.5, -40]], [[-19, -22], [-16.5, -22], [-16.5, -40]], [[-16.5, -40, 5.3], [-8, -40, 5.3]], [[-8, -40], [-3, -40], [-3, -52], [0, -52]], [[-3, -40], [-3, -28], [0, -28]], [[56, -52], [80, -52], [80, -62], [102, -62]], [[56, -28], [80, -28], [80, -18], [102, -18]]] },
   ab: { n: 'Ablauf (gereinigt)', c: 0x2fa8e0, y: 2.2, p: [[[118, -62], [124, -62], [124, -40], [creekX(-40) - 4, -40]], [[118, -18], [124, -18], [124, -40]]] },
   rs: { n: 'Rücklaufschlamm', c: 0xe17055, y: 2.9, p: [[[102, -62], [76, -46], [72, -40]], [[102, -18], [76, -34], [72, -40]], [[72, -40], [2, -40]], [[2, -40], [2, -52]], [[2, -40], [2, -28]]] },
   lu: { n: 'Prozessluft', c: 0x9ad8ff, y: 3.5, p: [[[28, -4], [28, -40]], [[28, -40], [52, -40]], [[34, -40], [34, -52]], [[34, -40], [34, -28]], [[46, -40], [46, -52]], [[46, -40], [46, -28]]] },
   fm: { n: 'Fällmittel FeCl₃', c: 0xb98be0, y: 3.0, p: [[[62, -4], [62, -38], [55, -38]]] },
   sl: { n: 'Schlamm (PS/ÜS/DS/FS)', c: 0x7a5233, y: 2.6, p: [[[-28, -58], [-28, 34]], [[72, -40], [72, 20], [-22, 20], [-24, 34]], [[-25, 40], [-8, 40], [28, 45]], [[28, 45], [12, 62], [-4, 77]]] },
   gs: { n: 'Faulgas', c: 0xf1c40f, y: 4.0, p: [[[28, 45], [70, 58]], [[70, 58], [58, 28]], [[70, 58], [98, 70]]] },
-  as: { n: 'Mischwasserabschlag', c: 0xd63031, y: 2.2, p: [[[-14, -40], [-14, -92], [creekX(-92) - 4, -92]]] }
+  as: { n: 'Mischwasserabschlag', c: 0xd63031, y: 2.2, p: [[[-16.5, -44], [-16.5, -74], [-14, -74], [-14, -92], [creekX(-92) - 4, -92]]] }
 };
+{
+  const mh = [];
+  for (const k of ['aw', 'ab', 'rs', 'sl', 'as']) for (const line of FLOW[k].p) for (let i = 0; i < line.length - 1; i++) {
+    const [x0, z0] = line[i], [x1, z1] = line[i + 1], L = Math.hypot(x1 - x0, z1 - z0);
+    for (let t = 0; t < L; t += 28) { const x = x0 + (x1 - x0) * t / L, z = z0 + (z1 - z0) * t / L; if (!mh.some(([a, b]) => Math.hypot(a - x, b - z) < 10)) mh.push([x, z]); }
+  }
+  const im = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.4, 0.4, 0.06, 16), M.steelDark, mh.length), o = new THREE.Object3D();
+  mh.forEach(([x, z], i) => { o.position.set(x, 0.06, z); o.updateMatrix(); im.setMatrixAt(i, o.matrix); }); im.receiveShadow = true; scene.add(im);
+}
 const flowMats = [], flowGroup = new THREE.Group(); flowGroup.visible = false; scene.add(flowGroup);
 for (const k in FLOW) {
   const f = FLOW[k];
   for (const line of f.p) {
     const path = new THREE.CurvePath(); let L = 0;
     for (let i = 0; i < line.length - 1; i++) {
-      const a = new THREE.Vector3(line[i][0], f.y, line[i][1]), b = new THREE.Vector3(line[i + 1][0], f.y, line[i + 1][1]);
+      const a = new THREE.Vector3(line[i][0], line[i][2] ?? f.y, line[i][1]), b = new THREE.Vector3(line[i + 1][0], line[i + 1][2] ?? f.y, line[i + 1][1]);
       path.add(new THREE.LineCurve3(a, b)); L += a.distanceTo(b);
     }
     const mat = new THREE.ShaderMaterial({
@@ -775,8 +879,8 @@ const legend = document.getElementById('legend');
 legend.innerHTML = Object.values(FLOW).map(f => `<div><i style="background:#${new THREE.Color(f.c).getHexString()}"></i>${f.n}</div>`).join('') + '<div style="color:#8395a7;margin-top:3px">schematisch, Leitungen liegen erdverlegt</div>';
 
 // ------------------------------------------------------------------ UI: Labels, Auswahl, Rundgang
-const TOUR = ['zpw', 'rechen', 'sandfang', 'vk', 'abschlag', 'bb', 'geblaese', 'fecl3', 'nk', 'rs', 'ablauf', 've', 'ft', 'gs', 'bhkw', 'fackel', 'sew', 'bg', 'bach'];
-const SHORT = { zpw: 'Hebewerk', rechen: 'Rechen', sandfang: 'Sandfang', vk: 'VK1/VK2', abschlag: 'SV-201', bb: 'Belebung', geblaese: 'Gebläse', fecl3: 'FeCl₃', nk: 'NK1/NK2', rs: 'RS-PW', ablauf: 'Ablauf', ve: 'VE-1', ft: 'FT-1', gs: 'GS-1', bhkw: 'BHKW', fackel: 'F6.1', sew: 'Z6.1/SI6.1', bg: 'Betriebsgeb.', bach: 'Schwierbach' };
+const TOUR = ['zpw', 'rechen', 'sandfang', 'vk', 'abschlag', 'ab', 'bb', 'geblaese', 'fecl3', 'nk', 'rs', 'ablauf', 've', 'ft', 'gs', 'bhkw', 'fackel', 'sew', 'bg', 'bach'];
+const SHORT = { zpw: 'Hebewerk', rechen: 'Rechen', sandfang: 'Sandfang', vk: 'VK1/VK2', abschlag: 'SV-201', ab: 'AB-1', bb: 'Belebung', geblaese: 'Gebläse', fecl3: 'FeCl₃', nk: 'NK1/NK2', rs: 'RS-PW', ablauf: 'Ablauf', ve: 'VE-1', ft: 'FT-1', gs: 'GS-1', bhkw: 'BHKW', fackel: 'F6.1', sew: 'Z6.1/SI6.1', bg: 'Betriebsgeb.', bach: 'Schwierbach' };
 const labelBox = document.getElementById('labels');
 for (const id of TOUR) {
   const el = document.createElement('div'); el.className = 'lbl'; el.textContent = SHORT[id];
@@ -788,17 +892,19 @@ for (const id of RSI.subs) {
   el.addEventListener('click', e => { e.stopPropagation(); select(id, false); });
   labelBox.appendChild(el); comps[id].el = el;
 }
+for (const tg of RSI.tags) { tg.el = document.createElement('div'); tg.el.className = 'tag'; tg.el.textContent = tg.t; tg.el.style.display = 'none'; labelBox.appendChild(tg.el); }
 let interiorOn = false;
 function setInterior(on) {
   interiorOn = on; RSI.eq.visible = on; RSI.roof.visible = !on;
   for (const [w, h] of RSI.low) { const H2 = on ? 1.1 : h; w.scale.y = H2; w.position.y = H2 / 2; }
   for (const id of TOUR) comps[id].el.style.display = on ? 'none' : '';
   for (const id of RSI.subs) comps[id].el.style.display = on ? '' : 'none';
+  for (const tg of RSI.tags) tg.el.style.display = on ? '' : 'none';
 }
 function openInterior() {
   setInterior(true); marker.visible = false;
   const small = innerWidth / innerHeight < 0.8;
-  flyTo(new THREE.Vector3(72, 1.0, small ? -39 : -38), small ? new THREE.Vector3(51, 22, -17) : new THREE.Vector3(60, 12.5, -24), 1.6);
+  flyTo(small ? new THREE.Vector3(72, 0.5, -41) : new THREE.Vector3(71.5, 0.5, -36.5), small ? new THREE.Vector3(70, 25, -16) : new THREE.Vector3(70.5, 13.5, -20.5), 1.6);
   select('rs', false, true);
 }
 const marker = new THREE.Mesh(new THREE.RingGeometry(0.93, 1, 72).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xffd54a, transparent: true, depthWrite: false }));
@@ -813,6 +919,7 @@ function select(id, fly, keepInterior) {
   for (const k in comps) comps[k].el?.classList.toggle('sel', k === id);
   marker.visible = id !== 'bach' && !(interiorOn && id === 'rs'); marker.position.set(c.center.x, c.sub ? 0.2 : 0.12, c.center.z); marker.scale.setScalar(c.sub ? c.radius + 0.4 : c.radius + 2.5);
   infoBody.innerHTML = `<h2>${c.name}</h2><div class="kks">${c.kks}</div><p>${c.text}</p><table>${c.rows.map(r => `<tr><td class="k">${r[0]}</td><td>${r[1]}</td></tr>`).join('')}</table>` +
+    (c.link ? `<p style="margin-top:8px"><a href="${c.link[0]}" target="_blank" rel="noopener" style="color:#74b9ff;font-weight:bold">${c.link[1]}</a></p>` : '') +
     (c.note ? '<div class="note">* Abmessung für die 3D-Ansicht angenommen (in der PLS-Simulation nicht festgelegt).</div>' : '') +
     (c.interior ? `<p style="margin:10px 0 0"><button class="btn" id="bInt">${interiorOn ? '⬆ Außenansicht' : '🔍 Innenansicht öffnen'}</button></p>` : '') +
     (c.sub ? '<p style="margin:10px 0 0"><button class="btn" id="bIntBack">‹ Pumpwerk</button> <button class="btn" id="bIntOut">⬆ Außenansicht</button></p>' : '');
@@ -899,7 +1006,12 @@ function tick() {
   }
   controls.update();
   renderer.render(scene, camera);
-  for (const c of spinRS) c.rotation.y += 14 * dt;
+  for (const c of spinRS) c.rotation.x += 14 * dt;
+  if (showLbl && interiorOn) for (const tg of RSI.tags) {
+    pv.copy(tg.v).project(camera);
+    if (pv.z > 1 || Math.abs(pv.x) > 1.05 || Math.abs(pv.y) > 1.05) { tg.el.style.display = 'none'; continue; }
+    tg.el.style.display = ''; tg.el.style.transform = `translate(${(pv.x * .5 + .5) * innerWidth}px,${(-pv.y * .5 + .5) * innerHeight}px) translate(-50%,-100%)`;
+  }
   if (showLbl) for (const id of (interiorOn ? RSI.subs : TOUR)) {
     const c = comps[id]; pv.copy(c.anchor).project(camera);
     if (pv.z > 1 || Math.abs(pv.x) > 1.05 || Math.abs(pv.y) > 1.05) { c.el.style.display = 'none'; continue; }
