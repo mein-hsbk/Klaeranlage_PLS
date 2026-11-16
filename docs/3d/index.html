@@ -210,6 +210,7 @@ function reg(id, group, info) {
   comps[id] = { id, group, ...info, center: new THREE.Vector3(c.x, 0, c.z), anchor: info.anchor || new THREE.Vector3(c.x, b.max.y + 1.5, c.z), radius: Math.max(s.x, s.z) / 2 };
 }
 const anims = [];
+const spinRS = [];
 
 // Rundbecken (VK, NK, Voreindicker)
 function roundTank(cx, cz, r, o) {
@@ -455,12 +456,134 @@ scene.add(bubbleMesh);
     text: 'Trennung von belebtem Schlamm und gereinigtem Abwasser. Der Zulauf erfolgt zentral über das Einlaufbauwerk, das Klarwasser läuft über die Zahnschwellen in die Ablaufrinne.',
     rows: [['Bauform', '2 Rundbecken, Halbbrückenräumer, zentraler Einlauf'], ['Durchmesser', '≈ 32 m *'], ['Messung', 'LI 401 Schlammspiegel']], note: true });
 }
+// Rücklaufschlammpumpwerk – mit Innenansicht (Dach abnehmbar)
+const RSI = { subs: [], pick: [], low: [], roof: null, eq: null };
 {
-  const g = new THREE.Group();
-  building(g, 72, -40, 10, 9, 4.5, { wall: M.brick, doors: [{ s: 'e', w: 3, h: 3 }] });
+  const g = new THREE.Group(), cx = 72, cz = -40, W = 10, D = 20, Hh = 6.2, t = 0.3;
+  box(g, W, 0.12, D, M.concreteDark, cx, 0, cz, 0, false);
+  const wn = box(g, W, Hh, t, M.brick, cx, 0, cz - D / 2 + t / 2), ws = box(g, W, Hh, t, M.brick, cx, 0, cz + D / 2 - t / 2);
+  const ww = box(g, t, Hh, D - 2 * t, M.brick, cx - W / 2 + t / 2, 0, cz), we = box(g, t, Hh, D - 2 * t, M.brick, cx + W / 2 - t / 2, 0, cz);
+  RSI.low = [[ws, Hh], [ww, Hh]];
+  RSI.roof = box(g, W + 0.4, 0.45, D + 0.4, M.roof, cx, Hh, cz);
+  box(g, 0.12, 3.6, 3.2, M.door, cx + W / 2 + 0.03, 0, cz + 4, 0, false);                       // Rolltor Ost
+  for (const z of [-6, -2, 2, 6]) box(g, 0.1, 1.0, 2.2, M.window, cx + W / 2 + 0.03, 4.2, cz + z, 0, false);
   reg('rs', g, { name: 'Rücklaufschlammpumpwerk', kks: 'P3.1–P3.6 · P5.1 · FI 402',
-    text: 'Rückführung des in der Nachklärung abgesetzten Schlamms in die Belebung (Stufenschaltung nach RS-Sollwert). Der Überschussschlamm wird abgezweigt und zum Voreindicker gefördert.',
-    rows: [['RS-Pumpen', '6 × KSB Sewabloc F 100-252 (5 + 1 Reserve)'], ['Betriebspunkt', 'je ~80 m³/h bei ~12 m'], ['Messung', 'FI 402 Rücklaufschlamm gesamt'], ['ÜS-Pumpe', 'P5.1 Seepex BN 52-6L, drehzahlgeregelt, ~250 m³/d']] });
+    text: 'Rückführung des in der Nachklärung abgesetzten Schlamms in die Belebung. Die Steuerung schaltet so viele Pumpen zu, dass der RS-Sollwert möglichst genau erreicht wird (Stufenschaltung). Der Überschussschlamm wird abgezweigt und zum Voreindicker gefördert.',
+    rows: [['RS-Pumpen', '6 × KSB Sewabloc F 100-252, Festdrehzahl (ohne FU)'], ['Betriebspunkt', 'je ~80 m³/h bei ~12 m'], ['Schaltung', 'Stufenschaltung nach RS-Sollwert'], ['Messung', 'FI 402 Rücklaufschlamm gesamt'], ['ÜS-Pumpe', 'P5.1 Seepex BN 52-6L, drehzahlgeregelt']],
+    interior: true });
+
+  // ---------- Ausrüstung (nur in der Innenansicht sichtbar) ----------
+  const eq = new THREE.Group(); eq.visible = false; scene.add(eq); RSI.eq = eq;
+  const ksb = std(0x1d5b8f, { r: 0.45, m: 0.3 }), mot = std(0x7d8a96, { r: 0.45, m: 0.35 }), pipeM = std(0x8b939b, { r: 0.45, m: 0.5 }),
+        sx = std(0x4f6476, { r: 0.45, m: 0.35 }), lampOn = new THREE.MeshBasicMaterial({ color: 0x2ecc71 }), lampOff = std(0x3a4148), cab = std(0xd5d8db, { r: 0.6, m: 0.2 });
+  const pipe = (par, a, b, r, mat = pipeM) => {
+    const A = new THREE.Vector3(...a), B = new THREE.Vector3(...b), d = B.clone().sub(A), L = d.length();
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, L, 14), mat); m.position.copy(A).add(B).multiplyScalar(0.5);
+    m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize()); m.castShadow = true; par.add(m); return m;
+  };
+  const flange = (par, p, axis, r) => { const m = pipe(par, p.map((v, i) => v - (axis === i ? 0.03 : 0)), p.map((v, i) => v + (axis === i ? 0.03 : 0)), r, M.steelDark); return m; };
+  const valve = (par, x, y, z) => {           // Absperrschieber mit Handrad
+    box(par, 0.26, 0.42, 0.3, M.steelDark, x, y - 0.21, z); pipe(par, [x, y + 0.2, z], [x, y + 0.62, z], 0.025, M.steel);
+    const hw = new THREE.Mesh(new THREE.TorusGeometry(0.17, 0.025, 6, 20), M.steelDark); hw.rotation.x = Math.PI / 2; hw.position.set(x, y + 0.64, z); par.add(hw);
+  };
+  const gauge = (par, x, y, z) => { pipe(par, [x, y, z], [x, y + 0.28, z], 0.018, M.steel); const d = pipe(par, [x, y + 0.34, z - 0.03], [x, y + 0.34, z + 0.03], 0.07, M.white); return d; };
+  const subReg = (id, grp, label, anchor, info) => {
+    eq.add(grp); grp.traverse(o => { if (o.isMesh) { o.userData.comp = id; RSI.pick.push(o); } });
+    const b = new THREE.Box3().setFromObject(grp), c = b.getCenter(new THREE.Vector3()), s = b.getSize(new THREE.Vector3());
+    comps[id] = { id, group: grp, ...info, sub: true, short: label, center: new THREE.Vector3(c.x, 0, c.z), anchor: anchor || new THREE.Vector3(c.x, b.max.y + 0.35, c.z), radius: Math.max(s.x, s.z) / 2 };
+    RSI.subs.push(id);
+  };
+  const yS = 0.45, xP = cx + 0.4, xSS = cx + 3.4, xDS = cx - 3.6, yD = 2.4;
+  // Saug- und Drucksammler
+  pipe(eq, [xSS, yS, cz - 9.6], [xSS, yS, cz + 8.0], 0.17);
+  for (const z of [cz - 9.0, cz + 7.4]) pipe(eq, [xSS, yS, z], [cx + W / 2 + 0.6, yS, z], 0.17);
+  for (let z = cz - 9; z <= cz + 8; z += 2.5) box(eq, 0.12, yS - 0.12, 0.3, M.steelDark, xSS, 0.12, z, 0, false);
+  pipe(eq, [xDS, yD, cz - 9.2], [xDS, yD, cz + 8.8], 0.18);
+  pipe(eq, [xDS, yD, cz + 8.8], [cx - W / 2 - 0.6, yD, cz + 8.8], 0.18);
+  for (let z = cz - 9; z <= cz + 8; z += 2.5) box(eq, 0.12, yD - 0.12, 0.12, M.steelDark, xDS, 0.12, z, 0, false);
+  // FI 402 – MID im Drucksammler
+  {
+    const f = new THREE.Group(), z = cz + 6.9;
+    pipe(f, [xDS, yD, z - 0.35], [xDS, yD, z + 0.35], 0.26, std(0x3d5a73, { r: .5, m: .3 }));
+    for (const dz of [-0.36, 0.36]) pipe(f, [xDS, yD, z + dz - 0.03], [xDS, yD, z + dz + 0.03], 0.3, M.steelDark);
+    box(f, 0.22, 0.28, 0.3, std(0x2c3e50), xDS, yD + 0.26, z); box(f, 0.02, 0.14, 0.18, std(0x9fd3c7, { x: { emissive: 0x2a5a50 } }), xDS + 0.12, yD + 0.36, z, 0, false);
+    subReg('rs_fi402', f, 'FI 402', null, { name: 'Durchflussmessung RS gesamt', kks: 'FI 402',
+      text: 'Magnetisch-induktiver Durchflussmesser im Drucksammler. Er misst den gesamten Rücklaufschlammstrom und liefert den Istwert für die Stufenschaltung.',
+      rows: [['Messprinzip', 'MID (magnetisch-induktiv)'], ['Einbauort', 'Drucksammler, vor Abgang zur Belebung'], ['Verwendung', 'Istwert RS-Strom → Stufenschaltung']] });
+  }
+  // Pumpen P3.1–P3.6
+  const RUN = [true, true, true, true, false, false];
+  for (let i = 0; i < 6; i++) {
+    const z = cz - 6.0 + i * 2.5, p = new THREE.Group(), id = `rs_p3${i + 1}`;
+    box(p, 1.1, 0.12, 1.0, M.steelDark, xP, 0.12, z);                                            // Grundrahmen
+    cyl(p, 0.42, 0.44, 0.42, ksb, xP, 0.24, z, 28);                                              // Spiralgehäuse
+    pipe(p, [xP + 0.3, yS, z], [xSS - 0.1, yS, z], 0.085);                                       // Saugleitung DN 125
+    flange(p, [xP + 0.5, yS, z], 0, 0.13); valve(p, cx + 2.3, yS, z); gauge(p, cx + 1.7, yS + 0.08, z);
+    pipe(p, [xP - 0.3, yS, z], [cx - 2.9, yS, z], 0.07);                                         // Druckleitung DN 100
+    flange(p, [xP - 0.5, yS, z], 0, 0.12); gauge(p, xP - 0.75, yS + 0.06, z);
+    pipe(p, [cx - 0.75, yS, z], [cx - 0.35, yS, z], 0.12, std(0x3d5a73, { r: .5, m: .3 }));     // FI 41x
+    box(p, 0.15, 0.2, 0.18, std(0x2c3e50), cx - 0.55, yS + 0.1, z, 0, false);
+    box(p, 0.32, 0.3, 0.28, M.steelDark, cx - 1.5, yS - 0.15, z);                                // Rückschlagklappe
+    box(p, 0.08, 0.08, 0.3, M.steel, cx - 1.42, yS + 0.18, z + 0.18, 0, false);
+    valve(p, cx - 2.25, yS, z);
+    pipe(p, [cx - 2.9, yS, z], [cx - 2.9, yD, z], 0.07); pipe(p, [cx - 2.9, yD, z], [xDS, yD, z], 0.07);
+    for (const [dx, dz] of [[-.2, -.2], [.2, -.2], [.2, .2], [-.2, .2]]) box(p, 0.05, 0.45, 0.05, ksb, xP + dx, 0.66, z + dz, 0, false); // Laterne
+    const cpl = new THREE.Group(); cpl.position.set(xP, 0.88, z); p.add(cpl);
+    const cm = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.28, 14), M.steel); cpl.add(cm);
+    const mk = new THREE.Mesh(boxGeo, std(0xe6c229)); mk.scale.set(0.05, 0.26, 0.04); mk.position.set(0.12, 0, 0); cpl.add(mk);
+    if (RUN[i]) spinRS.push(cpl);
+    cyl(p, 0.24, 0.24, 0.06, ksb, xP, 1.08, z, 20);
+    cyl(p, 0.31, 0.31, 0.68, mot, xP, 1.14, z, 24);                                              // Motor 7,5 kW
+    cyl(p, 0.29, 0.29, 0.14, M.steelDark, xP, 1.82, z, 24);                                      // Lüfterhaube
+    box(p, 0.2, 0.18, 0.22, mot, xP - 0.38, 1.5, z, 0, false);                                   // Klemmenkasten
+    box(p, 0.02, 0.12, 0.2, M.galv, xP + 0.32, 1.42, z, 0, false);                               // Typenschild
+    box(p, 0.08, 1.15, 0.08, M.steelDark, cx + 1.25, 0, z + 0.65, 0, false);                     // Vor-Ort-Steuerstelle
+    box(p, 0.28, 0.36, 0.18, std(0xd9c27a), cx + 1.25, 1.15, z + 0.65, 0, false);
+    const lmp = new THREE.Mesh(new THREE.SphereGeometry(0.05, 10, 8), RUN[i] ? lampOn : lampOff); lmp.position.set(cx + 1.25, 1.42, z + 0.75); p.add(lmp);
+    subReg(id, p, `P3.${i + 1}`, null, { name: `Rücklaufschlammpumpe P3.${i + 1}`, kks: `P3.${i + 1} · FI 41${i + 1} · PI 42${i + 1} / PI 43${i + 1}`,
+      text: 'Trocken aufgestellte Freistromradpumpe mit Laterne und aufgesetztem Normmotor. Saugseitig Absperrschieber, druckseitig Durchflussmessung, Rückschlagklappe und Absperrschieber; Manometer vor und hinter der Pumpe.',
+      rows: [['Pumpe', 'KSB Sewabloc F 100-252, Laufrad ø235'], ['Auslegung', '95 m³/h bei 11,2 m · Betrieb ~80 m³/h bei ~12 m'], ['Motor', 'VEM K21R 132 M4, 7,5 kW, 1455 1/min, IE3'], ['Anlauf', 'Stern-Dreieck, Festdrehzahl'], ['Anschlüsse', 'DN 125 saug / DN 100 druck'], ['Im Bild', RUN[i] ? 'in Betrieb (Beispielzustand)' : 'Bereitschaft (Beispielzustand)']] });
+  }
+  // P5.1 – Exzenterschneckenpumpe Überschussschlamm
+  {
+    const f = new THREE.Group(), z = cz - 8.7;
+    box(f, 4.0, 0.14, 0.62, M.steelDark, cx - 0.3, 0.12, z);
+    pipe(f, [cx - 2.0, 0.5, z], [cx - 1.3, 0.5, z], 0.2, mot);                                   // Getriebemotor
+    box(f, 0.4, 0.42, 0.42, sx, cx - 1.1, 0.3, z);                                               // Getriebe
+    box(f, 0.6, 0.5, 0.45, sx, cx - 0.5, 0.26, z);                                               // Sauggehäuse
+    pipe(f, [cx - 0.2, 0.5, z], [cx + 1.4, 0.5, z], 0.15, sx);                                   // Stator
+    for (const x of [cx + 0.2, cx + 0.8]) pipe(f, [x, 0.5, z - 0.17], [x, 0.5, z + 0.17], 0.02, M.steel);
+    box(f, 0.22, 0.4, 0.38, sx, cx + 1.5, 0.3, z);                                               // Druckstutzen
+    pipe(f, [xSS, yS, z], [xSS - 0.4, yS, z], 0.1); pipe(f, [xSS - 0.4, yS, z], [xSS - 0.4, 1.6, z], 0.1);
+    pipe(f, [xSS - 0.4, 1.6, z], [cx - 0.5, 1.6, z], 0.1); pipe(f, [cx - 0.5, 1.6, z], [cx - 0.5, 0.76, z], 0.1);
+    pipe(f, [cx + 1.5, 0.7, z], [cx + 1.5, 2.9, z], 0.08); pipe(f, [cx + 1.5, 2.9, z], [cx + 1.5, 2.9, cz - D / 2 - 0.6], 0.08);
+    subReg('rs_p51', f, 'P5.1', null, { name: 'Überschussschlammpumpe P5.1', kks: 'P5.1',
+      text: 'Exzenterschneckenpumpe zum Abzug des Überschussschlamms. Die Fördermenge wird über die Drehzahl eingestellt; der Schlamm wird zum Voreindicker VE-1 gefördert.',
+      rows: [['Pumpe', 'Seepex BN 52-6L (Exzenterschnecke)'], ['Antrieb', 'Getriebemotor, drehzahlgeregelt (FU)'], ['Ziel', 'Voreindicker VE-1']] });
+  }
+  // Schaltanlage
+  {
+    const f = new THREE.Group(), z = cz + 9.45;
+    for (let k = 0; k < 4; k++) {
+      const x = cx - 1.4 + k * 0.84; box(f, 0.8, 2.1, 0.5, cab, x, 0.12, z);
+      box(f, 0.02, 1.9, 0.46, M.steelDark, x + 0.41, 0.2, z, 0, false);
+      for (let l = 0; l < 3; l++) { const m = new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 6), (k * 3 + l) < 4 ? lampOn : lampOff); m.position.set(x - 0.2 + l * 0.2, 1.8, z - 0.26); f.add(m); }
+    }
+    subReg('rs_sa', f, 'Schaltanlage', null, { name: 'Schaltanlage RS-Pumpwerk', kks: 'UV-3 · Stufenschaltung',
+      text: 'Motorabgänge mit Stern-Dreieck-Kombination für P3.1–P3.6 sowie Frequenzumrichter für P5.1. Die Stufenschaltung legt anhand des RS-Sollwerts die Anzahl der laufenden Pumpen fest.',
+      rows: [['Einspeisung', 'Unterverteilung UV-3 (Biologie/NK)'], ['Abgänge', '6 × Stern-Dreieck, 1 × FU (P5.1)'], ['Steuerung', 'Stufenschaltung, Betriebsstundenausgleich']] });
+  }
+  // Kran
+  {
+    const f = new THREE.Group();
+    box(f, 0.22, 0.4, D - 0.8, std(0xd9a62a, { r: .5, m: .3 }), xP, 5.3, cz);
+    box(f, 0.5, 0.35, 0.6, std(0xd9a62a, { r: .5, m: .3 }), xP, 4.95, cz - 1.2);
+    box(f, 0.03, 1.6, 0.03, M.steelDark, xP, 3.35, cz - 1.2, 0, false);
+    const hk = new THREE.Mesh(new THREE.TorusGeometry(0.08, 0.025, 6, 12, Math.PI * 1.4), M.steelDark); hk.position.set(xP, 3.3, cz - 1.2); f.add(hk);
+    subReg('rs_kran', f, 'Kran', new THREE.Vector3(xP, 6.0, cz + 6), { name: 'Laufkatze / Hebezeug', kks: 'Kranbahn über Pumpenreihe',
+      text: 'Elektrokettenzug auf einer Kranbahn über der Pumpenreihe. Motor und Laufradeinheit können zur Wartung angehoben und ausgebaut werden, ohne die Rohrleitungen zu demontieren (Back-Pull-Out).',
+      rows: [['Einsatz', 'Wartung, Laufrad-/Motortausch'], ['Hinweis', 'Prüfung nach DGUV Vorschrift 52/54']] });
+  }
 }
 {
   const g = new THREE.Group();
@@ -660,18 +783,44 @@ for (const id of TOUR) {
   el.addEventListener('click', e => { e.stopPropagation(); select(id, true); });
   labelBox.appendChild(el); comps[id].el = el;
 }
+for (const id of RSI.subs) {
+  const el = document.createElement('div'); el.className = 'lbl'; el.textContent = comps[id].short; el.style.display = 'none';
+  el.addEventListener('click', e => { e.stopPropagation(); select(id, false); });
+  labelBox.appendChild(el); comps[id].el = el;
+}
+let interiorOn = false;
+function setInterior(on) {
+  interiorOn = on; RSI.eq.visible = on; RSI.roof.visible = !on;
+  for (const [w, h] of RSI.low) { const H2 = on ? 1.1 : h; w.scale.y = H2; w.position.y = H2 / 2; }
+  for (const id of TOUR) comps[id].el.style.display = on ? 'none' : '';
+  for (const id of RSI.subs) comps[id].el.style.display = on ? '' : 'none';
+}
+function openInterior() {
+  setInterior(true); marker.visible = false;
+  const small = innerWidth / innerHeight < 0.8;
+  flyTo(new THREE.Vector3(72, 1.0, small ? -39 : -38), small ? new THREE.Vector3(51, 22, -17) : new THREE.Vector3(60, 12.5, -24), 1.6);
+  select('rs', false, true);
+}
 const marker = new THREE.Mesh(new THREE.RingGeometry(0.93, 1, 72).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xffd54a, transparent: true, depthWrite: false }));
 marker.visible = false; scene.add(marker);
 
 const info = document.getElementById('info'), infoBody = document.getElementById('infoBody'), tname = document.getElementById('tname');
 let selected = null, tourIdx = -1, auto = null;
-function select(id, fly) {
-  selected = id; const c = comps[id];
+function select(id, fly, keepInterior) {
+  const c = comps[id];
+  if (interiorOn && !c.sub && !keepInterior && id !== 'rs') setInterior(false);
+  selected = id;
   for (const k in comps) comps[k].el?.classList.toggle('sel', k === id);
-  marker.visible = id !== 'bach'; marker.position.set(c.center.x, 0.12, c.center.z); marker.scale.setScalar(c.radius + 2.5);
+  marker.visible = id !== 'bach' && !(interiorOn && id === 'rs'); marker.position.set(c.center.x, c.sub ? 0.2 : 0.12, c.center.z); marker.scale.setScalar(c.sub ? c.radius + 0.4 : c.radius + 2.5);
   infoBody.innerHTML = `<h2>${c.name}</h2><div class="kks">${c.kks}</div><p>${c.text}</p><table>${c.rows.map(r => `<tr><td class="k">${r[0]}</td><td>${r[1]}</td></tr>`).join('')}</table>` +
-    (c.note ? '<div class="note">* Abmessung für die 3D-Ansicht angenommen (in der PLS-Simulation nicht festgelegt).</div>' : '');
+    (c.note ? '<div class="note">* Abmessung für die 3D-Ansicht angenommen (in der PLS-Simulation nicht festgelegt).</div>' : '') +
+    (c.interior ? `<p style="margin:10px 0 0"><button class="btn" id="bInt">${interiorOn ? '⬆ Außenansicht' : '🔍 Innenansicht öffnen'}</button></p>` : '') +
+    (c.sub ? '<p style="margin:10px 0 0"><button class="btn" id="bIntBack">‹ Pumpwerk</button> <button class="btn" id="bIntOut">⬆ Außenansicht</button></p>' : '');
   info.style.display = 'block'; layout();
+  document.getElementById('bInt')?.addEventListener('click', () => { if (interiorOn) { setInterior(false); select('rs', true); } else openInterior(); });
+  document.getElementById('bIntBack')?.addEventListener('click', () => select('rs', false, true));
+  document.getElementById('bIntOut')?.addEventListener('click', () => { setInterior(false); select('rs', true); });
+  if (c.sub) return;
   tourIdx = TOUR.indexOf(id);
   tname.innerHTML = `${c.name} <small>${tourIdx + 1}/${TOUR.length}</small>`;
   if (fly) {
@@ -698,7 +847,7 @@ document.getElementById('bAuto').onclick = e => {
   select(TOUR[(tourIdx + 1) % TOUR.length], true);
   auto = setInterval(() => select(TOUR[(tourIdx + 1) % TOUR.length], true), 7000);
 };
-document.getElementById('bHome').onclick = () => { stopAuto(); deselect(); tourIdx = -1; tname.textContent = 'Rundgang starten ›'; HOME(); };
+document.getElementById('bHome').onclick = () => { stopAuto(); setInterior(false); deselect(); tourIdx = -1; tname.textContent = 'Rundgang starten ›'; HOME(); };
 document.getElementById('close').onclick = deselect;
 let showLbl = true;
 document.getElementById('bLbl').onclick = e => { showLbl = !showLbl; e.target.classList.toggle('on', showLbl); labelBox.style.display = showLbl ? '' : 'none'; };
@@ -713,8 +862,8 @@ canvas.addEventListener('pointerdown', e => { down = [e.clientX, e.clientY]; });
 canvas.addEventListener('pointerup', e => {
   if (!down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 6) return;
   ndc.set(e.clientX / innerWidth * 2 - 1, -(e.clientY / innerHeight) * 2 + 1); ray.setFromCamera(ndc, camera);
-  const h = ray.intersectObjects(pickables, false)[0];
-  if (h) select(h.object.userData.comp, false); else deselect();
+  const h = (interiorOn && ray.intersectObjects(RSI.pick, false)[0]) || ray.intersectObjects(pickables, false)[0];
+  if (h) select(h.object.userData.comp, false, interiorOn && h.object.userData.comp === 'rs'); else deselect();
 });
 
 function layout() {
@@ -750,7 +899,8 @@ function tick() {
   }
   controls.update();
   renderer.render(scene, camera);
-  if (showLbl) for (const id of TOUR) {
+  for (const c of spinRS) c.rotation.y += 14 * dt;
+  if (showLbl) for (const id of (interiorOn ? RSI.subs : TOUR)) {
     const c = comps[id]; pv.copy(c.anchor).project(camera);
     if (pv.z > 1 || Math.abs(pv.x) > 1.05 || Math.abs(pv.y) > 1.05) { c.el.style.display = 'none'; continue; }
     c.el.style.display = ''; c.el.style.transform = `translate(${(pv.x * .5 + .5) * innerWidth}px,${(-pv.y * .5 + .5) * innerHeight}px) translate(-50%,-100%)`;
