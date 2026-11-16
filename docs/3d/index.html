@@ -39,11 +39,59 @@
   #legend{position:fixed;right:8px;display:none;background:#16213ee6;border:1px solid #2d4a7a;border-radius:8px;padding:6px 8px;font-size:11px;line-height:1.55}
   #legend i{display:inline-block;width:16px;height:4px;border-radius:2px;margin-right:6px;vertical-align:middle}
   @media (max-width:520px){ #top .qmax{display:none} }
+  /* Begehung + Faulungssimulation */
+  #simClock{font-size:11px;color:#b2bec3;font-family:monospace}
+  .btn.alarm{background:#c0392b;border-color:#e74c3c;animation:bl 1s steps(2) infinite}
+  @keyframes bl{50%{background:#7b241c}}
+  @media (prefers-reduced-motion:reduce){.btn.alarm{animation:none}}
+  #walkbar{display:none}
+  body.walking #tour,body.walking #opts{display:none}
+  body.walking #walkbar{display:block}
+  #walkSt,#walkTools{display:flex;gap:6px;overflow-x:auto}
+  #walkTools{margin-top:7px}
+  #walkSt .btn,#walkTools .btn{font-size:12px;padding:6px 9px}
+  #walkTools .hint{flex:1;font-size:11px;color:#8395a7;align-self:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #cross{position:fixed;left:50%;top:50%;width:6px;height:6px;margin:-3px;border-radius:50%;background:#fff9;box-shadow:0 0 0 1px #0006;pointer-events:none;display:none}
+  body.walking #cross{display:block}
+  #hint{position:fixed;left:50%;top:calc(50% + 26px);transform:translateX(-50%);background:#16213ef0;border:1px solid #ffd54a;color:#ffeaa7;border-radius:8px;padding:9px 14px;font-size:14px;display:none;cursor:pointer}
+  #hint .k{display:inline-block;border:1px solid #ffeaa7;border-radius:4px;padding:0 5px;margin-left:6px;font-family:monospace;font-size:12px}
+  #joy{position:fixed;width:120px;height:120px;border-radius:50%;border:2px solid #fff6;background:#fff1;display:none;pointer-events:none}
+  #knob{position:absolute;left:40px;top:40px;width:40px;height:40px;border-radius:50%;background:#fff8}
+  .ov{position:fixed;inset:0;background:#0b1426cc;display:none;align-items:center;justify-content:center;padding:12px;z-index:6}
+  .card{background:#16213e;border:1px solid #2d4a7a;border-radius:12px;max-width:560px;width:100%;max-height:92vh;overflow:auto;padding:14px 16px;box-shadow:0 10px 40px #0009}
+  .card h2{margin:0 0 2px;font-size:17px;color:#ffeaa7}
+  .card .sub{color:#b2bec3;font-size:13px;margin-bottom:8px}
+  .card label{display:block;font-size:13px;color:#b2bec3;margin:10px 0 4px}
+  .card select{width:100%;font-size:16px;padding:8px;border-radius:6px;background:#0f3460;color:#fff;border:1px solid #2d4a7a}
+  .card details{font-size:12.5px;color:#dfe6e9;margin-top:10px}.card details p{margin:6px 0}
+  #dcv{width:100%;max-width:420px;display:block;margin:6px auto;border-radius:8px;background:#000}
+  #dInfo{font-size:13px;line-height:1.45;color:#dfe6e9}
+  #dAct{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+  .act{background:#e17055;border-color:#e17055}
+  #pls{position:fixed;right:8px;top:calc(env(safe-area-inset-top) + 58px);width:min(430px,calc(100% - 16px));max-height:calc(100% - 170px);overflow:auto;background:#0f1b30f5;border:1px solid #2d4a7a;border-radius:10px;padding:10px 12px;display:none;z-index:3}
+  #pls h3{margin:0 0 6px;font-size:14px;display:flex;justify-content:space-between;align-items:center}
+  #pls table{width:100%;border-collapse:collapse;font-size:12.5px}
+  #pls td{padding:3px 4px;border-bottom:1px solid #1f3352}
+  #pls td.tg{font-family:monospace;color:#74b9ff;white-space:nowrap}
+  #pls td.v{text-align:right;font-family:monospace;font-size:14px;white-space:nowrap}
+  #pls td.u{color:#b2bec3;white-space:nowrap}
+  .v.w{color:#fdcb6e}.v.a,.a{color:#ff7675;font-weight:bold}
+  .cnt{font-size:11.5px;color:#b2bec3;margin:6px 0}
+  #trend{width:100%;height:150px;display:block;border-radius:6px}
+  .leg{font-size:11px;color:#b2bec3;margin:3px 0 8px}.leg i{display:inline-block;width:12px;height:3px;margin:0 4px 2px 8px;vertical-align:middle}
+  .al{font-size:12px;padding:4px 6px;border-left:3px solid #2d4a7a;margin:2px 0;color:#8395a7}
+  .al span{font-family:monospace;margin-right:8px}
+  .al.on.kA{border-color:#e74c3c;color:#fff;background:#4a1a1a}.al.on.kW{border-color:#fdcb6e;color:#fff;background:#3d3417}.al.on.kM{border-color:#74b9ff;color:#fff}
+  #log{position:fixed;left:8px;right:8px;bottom:110px;max-width:720px;margin:0 auto;background:#0f1b30f5;border:1px solid #2d4a7a;border-radius:10px;padding:10px;display:none;z-index:4}
+  #logBody{font-family:monospace;font-size:11.5px;white-space:pre;overflow:auto;max-height:38vh;color:#dfe6e9}
+  #meldText{width:100%;min-height:110px;font-size:16px;border-radius:6px;padding:8px;background:#0f3460;color:#fff;border:1px solid #2d4a7a}
+  #toast{position:fixed;left:50%;bottom:120px;transform:translateX(-50%);background:#2d3436;border:1px solid #636e72;padding:9px 14px;border-radius:8px;font-size:13.5px;display:none;z-index:9;max-width:90%}
+  @media (max-width:600px){#top{gap:6px;padding-left:8px;padding-right:8px}#top h1{font-size:12px}#top .sub,#simClock,#bHome .t{display:none}#top .btn{padding:6px 7px;font-size:12px}}
   #load{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#16213e;color:#b2bec3;font-size:14px;z-index:9}
 </style>
 <script type="importmap">
-{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
-            "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}
+{"imports":{"three":"./vendor/three.module.min.js",
+            "three/addons/":"./vendor/addons/"}}
 </script>
 </head>
 <body>
@@ -52,8 +100,44 @@
 <div id="top">
   <div><h1>Kläranlage Schwierbach · 3D</h1><div class="sub">50.000 EW · Q<sub>TW</sub> 12.000 m³/d<span class="qmax"> · Q<sub>max</sub> 30.000 m³/d</span></div></div>
   <div class="sp"></div>
-  <button class="btn" id="bHome" title="Gesamtansicht">⌂ Übersicht</button>
+  <div style="text-align:right"><div id="simClock"></div></div>
+  <button class="btn" id="bPLS" title="Leitwarte Faulung/Gas (Tab)">Leitwarte</button>
+  <button class="btn" id="bWalk" title="Anlage in Ich-Perspektive begehen">🚶 Begehen</button>
+  <button class="btn" id="bHome" title="Gesamtansicht">⌂<span class="t"> Übersicht</span></button>
 </div>
+<div id="cross"></div>
+<div id="hint"></div>
+<div id="joy"><div id="knob"></div></div>
+<div id="pls">
+  <h3>Leitwarte · Faulung / Gas <button class="btn" id="plsClose" aria-label="Schließen">×</button></h3>
+  <div id="plsVals"></div>
+  <canvas id="trend"></canvas>
+  <div class="leg">Trend 12 h, Skala 0–100 %:<i style="background:#ffd32a"></i>LI 609<i style="background:#00d2d3"></i>P el (0–125 kW)<i style="background:#ff9f43"></i>Faulgas (0–80 Nm³/h)<i style="background:#a29bfe"></i>CH4 Vol-%<i style="background:#ff6b6b"></i>T FT (20–45 °C)</div>
+  <div id="plsAl"></div>
+</div>
+<div id="log"><div style="display:flex;gap:8px;align-items:center;margin-bottom:6px"><b style="flex:1">Protokoll</b><button class="btn" id="logCopy">Kopieren</button><button class="btn" id="logClose">×</button></div><div id="logBody"></div></div>
+<div class="ov" id="detail"><div class="card">
+  <div style="display:flex;align-items:flex-start;gap:8px"><div style="flex:1"><h2 id="dTitle"></h2><div class="sub" id="dName"></div></div><button class="btn" id="dClose" aria-label="Schließen">×</button></div>
+  <canvas id="dcv"></canvas><div id="dInfo"></div><div id="dAct"></div>
+</div></div>
+<div class="ov" id="meld"><div class="card">
+  <h2>Meldung an die Schichtleitung</h2>
+  <div class="sub">Befund, vermutete Ursache, durchgeführte oder vorgeschlagene Maßnahme</div>
+  <textarea id="meldText"></textarea>
+  <div style="display:flex;gap:8px;margin-top:10px;justify-content:flex-end"><button class="btn" id="meldCancel">Abbrechen</button><button class="btn on" id="meldOk">Protokollieren</button></div>
+</div></div>
+<div class="ov" id="szMenu"><div class="card">
+  <h2>Faulung – Szenario</h2>
+  <div class="sub">Die Faulung (Faulturm, Gasspeicher, BHKW, Fackel, Heizwasser) läuft als eigenes, vereinfachtes Prozessmodell. Ein Neustart setzt Zustand und Protokoll zurück.</div>
+  <label for="szSel">Szenario</label>
+  <select id="szSel"><option value="S0">S0</option><option value="S1">S1</option><option value="S2">S2</option></select>
+  <label for="spSel">Zeitraffer</label>
+  <select id="spSel"><option value="1">×1 (Echtzeit)</option><option value="10">×10</option><option value="60">×60 (1 s = 1 min)</option><option value="120">×120</option></select>
+  <label style="display:flex;gap:8px;align-items:center;color:#dfe6e9"><input type="checkbox" id="szExam"> Erklärtexte in der Detailansicht ausblenden</label>
+  <details><summary>Szenariobeschreibungen (für Lehrkräfte)</summary><div id="szInfo"></div></details>
+  <div style="display:flex;gap:8px;margin-top:14px;justify-content:flex-end"><button class="btn" id="szCancel">Abbrechen</button><button class="btn on" id="szStart">Neu starten</button></div>
+</div></div>
+<div id="toast"></div>
 <div id="info"><button id="close" aria-label="Schließen">×</button><div id="infoBody"></div></div>
 <div id="legend"></div>
 <div id="bottom">
@@ -68,12 +152,21 @@
     <button class="btn" id="bFlow">Fließwege</button>
     <button class="btn" id="bSpeed">Räumer ×100</button>
   </div>
+  <div id="walkbar">
+    <div id="walkSt"></div>
+    <div id="walkTools"><button class="btn" id="bSz">Szenario</button><button class="btn" id="bMeld">Meldung</button><button class="btn" id="bLog">Protokoll</button><span class="hint">W A S D gehen · Ziehen umsehen · E / Klick: Instrument · Tab: Leitwarte</span></div>
+  </div>
 </div>
 <div id="load">3D-Modell wird geladen …</div>
 
 <script type="module">
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { buildFaulung } from './js/faulung-szene.js';
+import { initFaulungUI } from './js/faulung-ui.js';
+import { createWalk } from './js/begehung.js';
+import { simTick } from './js/faulung-sim.js';
+const fui = initFaulungUI();
 
 // ------------------------------------------------------------------ Renderer / Szene
 const canvas = document.getElementById('c');
@@ -648,75 +741,9 @@ const RSI = { subs: [], pick: [], low: [], roof: null, eq: null, tags: [] };
     text: 'Statische Eindickung von Primär- und Überschussschlamm. Der Dickschlamm wird von der Dickschlammpumpe P6.2 im Gerätehaus zum Faulturm gefördert, das Trübwasser läuft zum Hebewerk zurück.',
     rows: [['Eindicker', 'Rundbecken, statisch, Krählwerk, Sohle 361,00 m NN'], ['Gerätehaus', 'FFB 361,00 m NN'], ['Dickschlammpumpe', 'P6.2 Sulzer PC (ESP), FU'], ['Messung', 'FI 613 Förderstrom Dickschlamm']] });
 }
-// Faulturm (Faulei)
-{
-  const g = new THREE.Group(), cx = 28, cz = 45, R = 7.8, H = 26, sunk = 4;
-  const cv = document.createElement('canvas'); cv.width = 64; cv.height = 8; const cx2 = cv.getContext('2d');
-  cx2.fillStyle = '#c9cdd1'; cx2.fillRect(0, 0, 64, 8); cx2.fillStyle = '#a9aeb3'; for (let i = 0; i < 64; i += 8) cx2.fillRect(i, 0, 3, 8);
-  const tex = new THREE.CanvasTexture(cv); tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(70, 1); tex.colorSpace = THREE.SRGBColorSpace;
-  const pts = []; let yTop = 0;
-  for (let i = 0; i <= 60; i++) {
-    const th = i / 60 * Math.PI, r = R * Math.pow(Math.sin(th), 0.85), y = -sunk + H / 2 * (1 - Math.cos(th));
-    if (i > 30 && r < 2.2) { yTop = y; pts.push(new THREE.Vector2(2.2, y), new THREE.Vector2(0, y)); break; }
-    pts.push(new THREE.Vector2(Math.max(r, 0.01), y));
-  }
-  const egg = new THREE.Mesh(new THREE.LatheGeometry(pts, 64), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.45, metalness: 0.45 }));
-  egg.position.set(cx, 0, cz); egg.castShadow = egg.receiveShadow = true; g.add(egg);
-  cyl(g, 6.3, 6.5, 0.8, M.concrete, cx, 0, cz, 48);
-  cyl(g, 1.5, 1.5, 1.6, M.steel, cx, yTop, cz, 24);                        // Gasdom
-  cyl(g, 4.6, 4.6, 0.15, M.grating, cx, yTop - 0.2, cz, 40);               // Bühne
-  railing(circlePts(cx, cz, 4.5, 36), yTop - 0.05);
-  // Treppenturm
-  const tx = cx + R + 3.2;
-  for (const [dx, dz] of [[-1.5, -1.5], [1.5, -1.5], [1.5, 1.5], [-1.5, 1.5]]) box(g, 0.2, yTop, 0.2, M.steelDark, tx + dx, 0, cz + dz);
-  for (let y = 3; y < yTop; y += 3) { box(g, 3.2, 0.12, 3.2, M.grating, tx, y, cz); railing([[tx - 1.6, cz - 1.6], [tx + 1.6, cz - 1.6], [tx + 1.6, cz + 1.6], [tx - 1.6, cz + 1.6], [tx - 1.6, cz - 1.6]], y + 0.12, 1.0); }
-  box(g, (tx - 1.5) - (cx + 4.4), 0.12, 1.2, M.grating, (tx - 1.5 + cx + 4.4) / 2, yTop - 0.2, cz);
-  // Gasleitung (gelb) Turm → Gasspeicher/BHKW/Fackel
-  const gp = (x, y, z, L, ax) => { const m = cyl(g, 0.22, 0.22, L, M.gas, x, y, z, 12); if (ax === 'x') { m.rotation.z = Math.PI / 2; m.position.y = y; } if (ax === 'z') { m.rotation.x = Math.PI / 2; m.position.y = y; } };
-  gp(tx + 1.8, 0, cz, yTop + 1.2);
-  gp(tx + 1.8 + 5.1, 3, cz, 10.2, 'x');
-  gp(cx + R + 15, 3, cz + 6.5, 13, 'z');
-  // Maschinenhaus Faulung
-  building(g, 28, 58.5, 11, 6, 4.5, { wall: M.brick, doors: [{ s: 'e', w: 2.5, h: 3 }] });
-  reg('ft', g, { name: 'Faulturm FT-1', kks: 'P10.1 / P10.2 · W10.1 · FI 608',
-    text: 'Anaerobe Stabilisierung des Dickschlamms bei 37 °C. Der Faulturminhalt wird über die Umwälzpumpen und den Schlammwärmetauscher umgewälzt und beheizt; das entstehende Faulgas wird gespeichert und im BHKW verwertet.',
-    rows: [['Volumen', '2.200 m³'], ['Betrieb', 'mesophil, 37 °C'], ['Umwälzung', 'P10.1/P10.2 KSB Sewabloc F 100-254 (Betrieb/Reserve)'], ['Beheizung', 'W10.1 Rohr-in-Rohr-WT, Heizwasser BHKW'], ['Messung', 'FI 608 Faulgas']], note: true });
-}
-// Gasspeicher
-{
-  const g = new THREE.Group(), cx = 70, cz = 58;
-  cyl(g, 8.4, 8.4, 0.7, M.concrete, cx, 0, cz, 48);
-  const d = new THREE.Mesh(new THREE.SphereGeometry(8, 48, 18, 0, Math.PI * 2, 0, Math.PI / 2), M.membrane);
-  d.scale.y = 0.75; d.position.set(cx, 0.7, cz); d.castShadow = d.receiveShadow = true; g.add(d);
-  box(g, 1.6, 1.2, 1.0, M.green, cx - 9.5, 0, cz + 3);
-  for (let a = 0; a < 16; a++) ib('anchor', boxGeo, M.steelDark, cx + Math.cos(a / 16 * 6.283) * 8.3, 0.8, cz + Math.sin(a / 16 * 6.283) * 8.3, 0.3, 0.2, 0.3, 0, false);
-  reg('gs', g, { name: 'Gasspeicher GS-1', kks: 'GS-1 · 609',
-    text: 'Zwischenspeicherung des Faulgases zum Ausgleich zwischen Gasproduktion und Gasverbrauch im BHKW. Die Außenmembran wird vom Stützluftgebläse in Form gehalten.',
-    rows: [['Bauart', 'Doppelmembranspeicher'], ['Zubehör', 'Stützluftgebläse, Füllstandsmessung']] });
-}
-// BHKW
-{
-  const g = new THREE.Group();
-  box(g, 12, 3.6, 3.6, M.green, 58, 0, 28);
-  box(g, 3.2, 1.2, 2.4, M.steelDark, 54, 3.6, 28);
-  for (const x of [53.2, 54.8]) cyl(g, 0.55, 0.55, 0.08, M.rubber, x, 4.8, 28, 20);
-  cyl(g, 0.3, 0.3, 9.5, M.steel, 63, 0, 26.8, 16);
-  box(g, 2, 2, 1.4, M.sheetBlue, 66, 0, 28);
-  for (let x = 54; x <= 62; x += 4) ib('door', boxGeo, M.door, x, 1.1, 29.85, 1.2, 2.2, 0.08, 0, false);
-  reg('bhkw', g, { name: 'Blockheizkraftwerk', kks: 'BHKW · V6.1',
-    text: 'Verwertung des Faulgases in einem Gasmotor mit Generator. Die Abwärme beheizt über das Heizwasser den Faulturm und die Gebäude, der Strom deckt einen Teil des Eigenbedarfs der Kläranlage.',
-    rows: [['Aggregat', 'Faulgas-Motor mit Generator (Container)'], ['Gasverdichter', 'V6.1 Seitenkanalverdichter'], ['Wärme', 'Heizwasser ⇄ W10.1 (Faulturm)']] });
-}
-// Fackel
-{
-  const g = new THREE.Group();
-  box(g, 5, 0.3, 5, M.concrete, 98, 0, 70);
-  cyl(g, 0.9, 0.9, 8, M.steel, 98, 0.3, 70, 24); cyl(g, 0.95, 0.95, 1.2, M.steelDark, 98, 7.3, 70, 24);
-  railing([[95.5, 67.5], [100.5, 67.5], [100.5, 72.5], [95.5, 72.5], [95.5, 67.5]], 0.3, 1.8);
-  reg('fackel', g, { name: 'Gasfackel F6.1', kks: 'F6.1',
-    text: 'Sicherheitseinrichtung: verbrennt Überschussgas, wenn der Gasspeicher voll ist oder das BHKW nicht abnehmen kann. Geschlossene Brennkammer – die Flamme ist von außen nicht sichtbar.',
-    rows: [['Bauart', 'Hochtemperaturfackel (geschlossen)'], ['Betrieb', 'nur bei Gasüberschuss']] });
-}
+// Faulung im Detail (Faulturm, Maschinenhaus, Gasspeicher, Gasstrecke, BHKW, Fackel) → js/faulung-szene.js
+const faul = buildFaulung(scene, { box, cyl, railing, circlePts, reg, M, std }, { toast: (m) => fui.toast(m) });
+fui.setInsts(faul.insts);
 // Schlammentwässerung + Silo
 {
   const g = new THREE.Group();
@@ -799,7 +826,7 @@ sign('Gebläsestation', 22, 3.6, 0.56);
 sign('Rücklaufschlammpumpwerk', 77.07, 4.9, -40, Math.PI / 2, 4.2);
 sign('Gerätehaus Schlammbehandlung', -8, 4.4, 45.06, 0, 4.6);
 sign('Schlammentwässerung', -4, 6.2, 70.94, Math.PI, 4.0);
-sign('Faulung', 33.56, 3.4, 58.5, Math.PI / 2, 2.6);
+sign('Faulung', 33.7, 3.4, 58.6, Math.PI / 2, 2.6);
 // Beckengeländer
 railing([[0, -62], [56, -62], [56, -18], [0, -18], [0, -62]], 1.0);
 railing([[-84, -45.5], [-56, -45.5], [-56, -34.5], [-84, -34.5], [-84, -45.5]], 0.8);
@@ -921,9 +948,11 @@ function select(id, fly, keepInterior) {
   infoBody.innerHTML = `<h2>${c.name}</h2><div class="kks">${c.kks}</div><p>${c.text}</p><table>${c.rows.map(r => `<tr><td class="k">${r[0]}</td><td>${r[1]}</td></tr>`).join('')}</table>` +
     (c.link ? `<p style="margin-top:8px"><a href="${c.link[0]}" target="_blank" rel="noopener" style="color:#74b9ff;font-weight:bold">${c.link[1]}</a></p>` : '') +
     (c.note ? '<div class="note">* Abmessung für die 3D-Ansicht angenommen (in der PLS-Simulation nicht festgelegt).</div>' : '') +
+    (c.walk ? `<p style="margin:10px 0 0"><button class="btn" id="bWalkHere">🚶 Hier begehen</button></p>` : '') +
     (c.interior ? `<p style="margin:10px 0 0"><button class="btn" id="bInt">${interiorOn ? '⬆ Außenansicht' : '🔍 Innenansicht öffnen'}</button></p>` : '') +
     (c.sub ? '<p style="margin:10px 0 0"><button class="btn" id="bIntBack">‹ Pumpwerk</button> <button class="btn" id="bIntOut">⬆ Außenansicht</button></p>' : '');
   info.style.display = 'block'; layout();
+  document.getElementById('bWalkHere')?.addEventListener('click', () => { deselect(); stopAuto(); walk.enter(c.walk); });
   document.getElementById('bInt')?.addEventListener('click', () => { if (interiorOn) { setInterior(false); select('rs', true); } else openInterior(); });
   document.getElementById('bIntBack')?.addEventListener('click', () => select('rs', false, true));
   document.getElementById('bIntOut')?.addEventListener('click', () => { setInterior(false); select('rs', true); });
@@ -954,7 +983,7 @@ document.getElementById('bAuto').onclick = e => {
   select(TOUR[(tourIdx + 1) % TOUR.length], true);
   auto = setInterval(() => select(TOUR[(tourIdx + 1) % TOUR.length], true), 7000);
 };
-document.getElementById('bHome').onclick = () => { stopAuto(); setInterior(false); deselect(); tourIdx = -1; tname.textContent = 'Rundgang starten ›'; HOME(); };
+document.getElementById('bHome').onclick = () => { walk.exit(); document.getElementById('bWalk').classList.remove('on'); stopAuto(); setInterior(false); deselect(); tourIdx = -1; tname.textContent = 'Rundgang starten ›'; HOME(); };
 document.getElementById('close').onclick = deselect;
 let showLbl = true;
 document.getElementById('bLbl').onclick = e => { showLbl = !showLbl; e.target.classList.toggle('on', showLbl); labelBox.style.display = showLbl ? '' : 'none'; };
@@ -967,11 +996,26 @@ controls.addEventListener('start', () => { fly = null; stopAuto(); });
 const ray = new THREE.Raycaster(), ndc = new THREE.Vector2(); let down = null;
 canvas.addEventListener('pointerdown', e => { down = [e.clientX, e.clientY]; });
 canvas.addEventListener('pointerup', e => {
+  if (walk.active) return;
   if (!down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 6) return;
   ndc.set(e.clientX / innerWidth * 2 - 1, -(e.clientY / innerHeight) * 2 + 1); ray.setFromCamera(ndc, camera);
   const h = (interiorOn && ray.intersectObjects(RSI.pick, false)[0]) || ray.intersectObjects(pickables, false)[0];
   if (h) select(h.object.userData.comp, false, interiorOn && h.object.userData.comp === 'rs'); else deselect();
 });
+
+// ------------------------------------------------------------------ Begehung (Ich-Perspektive) → js/begehung.js
+const walk = createWalk({ scene, camera, canvas, controls, fence: FENCE, getInstMeshes: () => faul.instMeshes, insts: faul.insts,
+  onInspect: (id, msg) => fui.openDetail(id, msg),
+  onPickComp: (r) => { const h = r.intersectObjects(pickables, false)[0]; if (!h || h.distance > 60) return null; select(h.object.userData.comp, false); return h.distance; },
+  isBlocked: () => fui.isBlocked() });
+document.getElementById('bWalk').onclick = e => {
+  if (walk.active) { walk.exit(); e.target.classList.remove('on'); e.target.textContent = '🚶 Begehen'; return; }
+  stopAuto(); setInterior(false); deselect(); walk.enter('faulturm'); e.target.classList.add('on'); e.target.textContent = '⬆ Luftbild';
+};
+const _enter = walk.enter;
+walk.enter = (k) => { _enter(k); const b = document.getElementById('bWalk'); b.classList.add('on'); b.textContent = '⬆ Luftbild'; };
+const _exit = walk.exit;
+walk.exit = () => { _exit(); const b = document.getElementById('bWalk'); b.classList.remove('on'); b.textContent = '🚶 Begehen'; layout(); };
 
 function layout() {
   const bh = document.getElementById('bottom').offsetHeight;
@@ -986,7 +1030,8 @@ camera.position.copy(homePos()); controls.target.copy(homeTgt());
 const clock = new THREE.Clock(), o3 = new THREE.Object3D(), pv = new THREE.Vector3();
 let elapsed = 0;
 function tick() {
-  const dt = Math.min(clock.getDelta(), 0.1); elapsed += dt;
+  const raw = clock.getDelta(), dt = Math.min(raw, 0.1); elapsed += dt;
+  simTick(raw); faul.update(dt, camera, fui.detail); fui.update(dt);
   for (const a of anims) {
     if (a.type === 'rot') a.obj.rotation.y -= a.omega * dt * speed;
     else { a.s = (a.s ?? 0) + a.v * dt * speed; const L = a.b - a.a, ph = a.s % (2 * L); a.obj.position.x = a.a + (ph < L ? ph : 2 * L - ph); }
@@ -999,12 +1044,15 @@ function tick() {
   for (const w of waters) { w.tex.offset.x += w.flow[0] * dt; w.tex.offset.y += w.flow[1] * dt; }
   for (const m of flowMats) m.uniforms.uT.value = elapsed;
   if (marker.visible) marker.material.opacity = 0.55 + 0.45 * Math.sin(elapsed * 4);
-  if (fly) {
-    let t = Math.min(1, (performance.now() - fly.t0) / fly.dur); const e = t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-    controls.target.lerpVectors(fly.ft, fly.tt, e); camera.position.lerpVectors(fly.fp, fly.tp, e);
-    if (t >= 1) fly = null;
+  if (walk.active) walk.update(dt);
+  else {
+    if (fly) {
+      let t = Math.min(1, (performance.now() - fly.t0) / fly.dur); const e = t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+      controls.target.lerpVectors(fly.ft, fly.tt, e); camera.position.lerpVectors(fly.fp, fly.tp, e);
+      if (t >= 1) fly = null;
+    }
+    controls.update();
   }
-  controls.update();
   renderer.render(scene, camera);
   for (const c of spinRS) c.rotation.x += 14 * dt;
   if (showLbl && interiorOn) for (const tg of RSI.tags) {
@@ -1014,12 +1062,13 @@ function tick() {
   }
   if (showLbl) for (const id of (interiorOn ? RSI.subs : TOUR)) {
     const c = comps[id]; pv.copy(c.anchor).project(camera);
+    if (walk.active && c.center.distanceTo(camera.position) > 45) { c.el.style.display = 'none'; continue; }
     if (pv.z > 1 || Math.abs(pv.x) > 1.05 || Math.abs(pv.y) > 1.05) { c.el.style.display = 'none'; continue; }
     c.el.style.display = ''; c.el.style.transform = `translate(${(pv.x * .5 + .5) * innerWidth}px,${(-pv.y * .5 + .5) * innerHeight}px) translate(-50%,-100%)`;
   }
   requestAnimationFrame(tick);
 }
-window.__ka3d = { THREE, scene, renderer, camera, controls };
+window.__ka3d = { THREE, scene, renderer, camera, controls, walk, faul };
 document.getElementById('load').remove();
 tick();
 </script>
