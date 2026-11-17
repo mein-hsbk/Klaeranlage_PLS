@@ -977,8 +977,8 @@ const legend = document.getElementById('legend');
 legend.innerHTML = Object.values(FLOW).map(f => `<div><i style="background:#${new THREE.Color(f.c).getHexString()}"></i>${f.n}</div>`).join('') + '<div style="color:#8395a7;margin-top:3px">schematisch, Leitungen liegen erdverlegt</div>';
 
 // ------------------------------------------------------------------ UI: Labels, Auswahl, Rundgang
-const TOUR = ['zpw', 'rechen', 'sandfang', 'vk', 'abschlag', 'ab', 'bb', 'geblaese', 'fecl3', 'nk', 'rs', 'ablauf', 've', 'ft', 'gs', 'bhkw', 'fackel', 'sew', 'bg', 'bach'];
-const SHORT = { zpw: 'Hebewerk', rechen: 'Rechen', sandfang: 'Sandfang', vk: 'VK1/VK2', abschlag: 'SV-201', ab: 'AB-1', bb: 'Belebung', geblaese: 'Gebläse', fecl3: 'FeCl₃', nk: 'NK1/NK2', rs: 'RS-PW', ablauf: 'Ablauf', ve: 'VE-1', ft: 'FT-1', gs: 'GS-1', bhkw: 'BHKW', fackel: 'F6.1', sew: 'Z6.1/SI6.1', bg: 'Betriebsgeb.', bach: 'Schwierbach' };
+const TOUR = ['talstr', 'zpw', 'rechen', 'sandfang', 'vk', 'abschlag', 'ab', 'bb', 'geblaese', 'fecl3', 'nk', 'rs', 'ablauf', 've', 'ft', 'gs', 'bhkw', 'fackel', 'sew', 'bg', 'bach'];
+const SHORT = { talstr: 'PW Talstraße', zpw: 'Hebewerk', rechen: 'Rechen', sandfang: 'Sandfang', vk: 'VK1/VK2', abschlag: 'SV-201', ab: 'AB-1', bb: 'Belebung', geblaese: 'Gebläse', fecl3: 'FeCl₃', nk: 'NK1/NK2', rs: 'RS-PW', ablauf: 'Ablauf', ve: 'VE-1', ft: 'FT-1', gs: 'GS-1', bhkw: 'BHKW', fackel: 'F6.1', sew: 'Z6.1/SI6.1', bg: 'Betriebsgeb.', bach: 'Schwierbach' };
 const labelBox = document.getElementById('labels');
 for (const id of TOUR) {
   const el = document.createElement('div'); el.className = 'lbl'; el.textContent = SHORT[id];
@@ -1037,7 +1037,7 @@ function select(id, fly, keepInterior) {
     flyTo(tgt, tgt.clone().addScaledVector(dir, id === 'bach' ? 70 : d));
   }
 }
-function deselect() { selected = null; marker.visible = false; info.style.display = 'none'; for (const k in comps) comps[k].el.classList.remove('sel'); layout(); }
+function deselect() { selected = null; marker.visible = false; info.style.display = 'none'; for (const k in comps) comps[k].el?.classList.remove('sel'); layout(); }
 let fly = null;
 function flyTo(target, pos, dur = 1.6) { fly = { t0: performance.now(), dur: dur * 1000, ft: controls.target.clone(), fp: camera.position.clone(), tt: target, tp: pos }; }
 const homePos = () => innerWidth / innerHeight < 0.8 ? new THREE.Vector3(-345, 290, 105) : new THREE.Vector3(-150, 185, 235);
