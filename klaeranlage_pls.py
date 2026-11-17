@@ -983,7 +983,7 @@ def _(
         # Sauerstoffbedarf und Belüftungsenergie
         ov_c = cv["bsb"] * Q / 1000 * (0.56 + 0.15 * t_ts * FT / (1 + 0.17 * t_ts * FT))
         ov = ov_c + (4.3 * n_nit - 2.86 * n_d) * Q / 1000            # kg O₂/d
-        cs = 14.65 - 0.41 * T + 0.0079 * T * T
+        cs = 14.652 - 0.41022 * T + 0.007991 * T * T - 0.000077774 * T ** 3  # O2-Saettigung bei 1013 hPa (Elmore/Hayes, DIN EN ISO 5814)
         def _ebel(o2_, membran, turbo, intermit):
             sae = 2.0 * (1.35 if membran else 1.0) * (1.18 if turbo else 1.0)   # kg O₂/kWh
             return ov / sae * (cs - 2.0) / max(0.5, cs - o2_) * (0.92 if intermit else 1.0)

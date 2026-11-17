@@ -17,6 +17,11 @@ Faulung/Gas und Belüftung laufen als eigene, vereinfachte Prozessmodelle im Zei
 geht in den Eigenbedarf der Energiebilanz ein. Vor-Ort-Instrumente zeigen live die Modellwerte, einige sind
 bedienbar. Die Leitwarte (Reiter Faulung/Gas und Belüftung) zeigt bewusst nur Sammelmeldungen; die
 O₂-Regler QIC 301/311 lassen sich dort bedienen (AUTO/HAND, Sollwert, Kp, Tn, Hand-Stellwert).
+Vor Ort lassen sich u. a. bedienen: Betriebsart und Hand-Frequenz beider Gebläse am FU (AUTO/RESERVE/HAND/AUS),
+Regelklappen FV 301/311 (FERN/ORT, Handstellung), O₂-Sonden (ziehen, reinigen, Luftkalibrierung mit Luftdruck-Eingabe,
+Handmessung) sowie Prüfungen an Gebläsen. Auch Fehlbedienungen wirken sich im Modell aus (z. B. Parallelbetrieb,
+Klappe auf ORT, Sonde im AUTO-Betrieb gezogen, Kalibrierung mit falschem Luftdruck) und erscheinen im Missionsbericht.
+O₂-Sättigung: c_s(T) nach Elmore/Hayes (DIN EN ISO 5814) bei 1013 hPa, skaliert mit dem Luftdruck (PI 001 in der Leitwarte).
 
 Über „🎯 Missionen“ startet eine vorbereitete Betriebssituation: Auftrag (Briefing) → Start an der Leitwarte →
 Kontrollgang → „Beenden“ öffnet den **Missionsbericht**: erfüllte Prüfschritte mit Begründung, Energiekennzahl,

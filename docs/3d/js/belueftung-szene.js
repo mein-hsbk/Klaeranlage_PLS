@@ -1,7 +1,7 @@
 // Belüftung im Detail: Gebläsestation (begehbar) mit G1.1/G1.2, FU-Schrank und Vor-Ort-Messungen,
 // Luftverteilung mit Regelklappen FV 301 / FV 311, Sondenausleger QI 301 (Straße 1) / QI 311 (Straße 2).
 import * as THREE from 'three';
-import { PB, STR, sondeZiehen, sondeReinigen, sondeKalibrieren, handmessung, csWert } from './belueftung-modell.js';
+import { PB, STR, GEB, MODI, sondeZiehen, sondeReinigen, sondeKalibrieren, handmessung, gebMode, gebHz, fvOrt, fvPos } from './belueftung-modell.js';
 import { sim, logA } from './anlage-sim.js';
 import { f1, f0, noise, gauge, lcd, lamp, plate, senses, makeInstFactory, pipeFactory } from './instrumente.js';
 
@@ -29,7 +29,7 @@ export function buildBelueftung(scene, h, hooks = {}) {
     const l2 = new THREE.PointLight(0xfff2d6, 14, 14, 1.6); l2.position.set(31, 4.4, -4); g.add(l2);
 
     // Gebläseaggregate in Schallhauben
-    const aggregat = (x, id, nr) => {
+    const aggregat = (x, id, nr, gi) => {
       box(g, 2.8, 0.15, 2.2, M.steelDark, x, 0, -4.5);
       box(g, 2.6, 1.8, 2.0, std(0x3e6d8e, { r: 0.6, m: 0.2 }), x, 0.15, -4.5);
       for (let k = 0; k < 4; k++) noCol(box(g, 0.5, 0.06, 0.02, M.steelDark, x - 0.9 + k * 0.6, 1.4, -3.49, 0, false));       // Lüftungsschlitze
@@ -40,17 +40,21 @@ export function buildBelueftung(scene, h, hooks = {}) {
         info: 'Drehkolbengebläse mit Riemenantrieb und FU-geregeltem Motor in einer Schallhaube. Die Fördermenge ist nahezu proportional zur Drehzahl.',
         draw: plate(nr, '#ecf0f1'),
         detail: (ctx, W, Hc) => {
-          const on = nr === 'G1.1', B = sim.B;
-          senses(ctx, W, Hc, `Gebläse ${nr}`, on ? [`Läuft, ${B.hz > 44 ? 'sehr laut, hohe Drehzahl' : B.hz > 36 ? 'deutlich lauter als sonst' : 'gleichmäßiges Pumpgeräusch'},`, `Haube warm, Luftzug an den Schlitzen.`, `Laut FU: ${f1(B.hz)} Hz`] : ['Steht (Bereitschaft).', 'Kein Geräusch, Haube kalt.'], on);
-        } });
+          const x = sim.B.g[gi];
+          senses(ctx, W, Hc, `Gebläse ${nr}`, x.run ? [`Läuft, ${x.hz > 44 ? 'sehr laut, hohe Drehzahl' : x.hz > 36 ? 'deutlich lauter als üblich' : 'gleichmäßiges Pumpgeräusch'},`, 'Haube warm, Luftzug an den Schlitzen.', `Betriebsart am FU: ${MODI[x.mode]}`] : ['Steht. Kein Geräusch, Haube kalt.', `Betriebsart am FU: ${MODI[x.mode]}`], x.run);
+        },
+        actions: () => [
+          { label: 'Ansaugfilter prüfen', fn: () => { logA(`${nr} Ansaugfilter geprüft: Filtermatte leicht grau, in Ordnung`, 'messung'); toast('Filtermatte leicht grau verfärbt – noch in Ordnung, kein Wechsel nötig.'); } },
+          { label: 'Riementrieb prüfen', fn: () => { logA(`${nr} Riementrieb geprüft: Spannung und Zustand in Ordnung`, 'messung'); toast(sim.B.g[gi].run ? 'Nur im Stillstand prüfen! Sichtprüfung: Riemen läuft ruhig.' : 'Riemenspannung und Riemenzustand in Ordnung.'); } },
+        ] });
     };
-    aggregat(25.5, 'g11', 'G1.1'); aggregat(31, 'g12', 'G1.2');
+    aggregat(25.5, 'g11', 'G1.1', 0); aggregat(31, 'g12', 'G1.2', 1);
     makeInst('pdi201', { name: 'Differenzdruck Ansaugfilter G1.1', tag: 'PDI 201', pos: [24.5, 1.05, -3.49], size: 0.22, round: true,
       info: 'Differenzdruckanzeige über dem Ansaugfilter von G1.1. Ein steigender Wert zeigt einen verschmutzten Filter an.',
       draw: (ctx, W) => gauge(ctx, W, { min: 0, max: 50, ticks: 5, unit: 'mbar', tag: 'PDI 201', val: sim.B.pdi + noise(0.3, 7), red: [35, 50] }) });
     makeInst('pi201', { name: 'Manometer Druckleitung G1.1', tag: 'PI 201', pos: [25.9, 1.75, -6.62], size: 0.26, round: true,
       info: 'Manometer auf der Druckseite von G1.1 vor der Rückschlagklappe. Der Druck ergibt sich aus Wassertiefe über den Belüftern und den Leitungsverlusten.',
-      draw: (ctx, W) => gauge(ctx, W, { min: 0, max: 1000, ticks: 5, unit: 'mbar', tag: 'PI 201', val: sim.B.pD + noise(4, 8) }) });
+      draw: (ctx, W) => gauge(ctx, W, { min: 0, max: 1000, ticks: 5, unit: 'mbar', tag: 'PI 201', val: sim.B.g[0].pD + (sim.B.g[0].run ? noise(4, 8) : 0) }) });
     makeInst('ti201', { name: 'Thermometer Druckstutzen G1.1', tag: 'TI 201', pos: [25.9, 2.2, -6.62], size: 0.22, round: true,
       info: 'Temperatur der verdichteten Luft am Druckstutzen von G1.1.',
       draw: (ctx, W) => gauge(ctx, W, { min: 0, max: 150, ticks: 6, unit: '°C', tag: 'TI 201', val: sim.B.tD }) });
@@ -64,15 +68,19 @@ export function buildBelueftung(scene, h, hooks = {}) {
     // FU-Schrank an der Westwand
     box(g, 0.5, 2.0, 1.6, std(0xd5d8db, { r: 0.6, m: 0.2 }), 20.4, 0, -4.0);
     makeInst('fu201', { name: 'Frequenzumrichter Gebläse', tag: 'FU G1.1/G1.2', pos: [20.66, 1.45, -4.0], rotY: Math.PI / 2, size: 0.9, aspect: 0.95,
-      info: 'Frequenzumrichter der Gebläse. Die Drehzahl wird von der Sauerstoffregelung über die Luftmenge vorgegeben (max. 50 Hz, min. ca. 13 Hz).',
+      info: 'Frequenzumrichter der beiden Gebläse mit Betriebsartenwahl. AUTO: Drehzahl folgt der Luftanforderung der Sauerstoffregler (Führungsgebläse). RESERVE: startet nur, wenn kein anderes Gebläse läuft. HAND: feste Frequenz. AUS: Gebläse gesperrt.',
       draw: (ctx, W, Hc) => {
-        const B = sim.B;
-        lcd(ctx, W, Hc, 'FU G1.1   (G1.2 Reserve)', [
-          `G1.1  AUTO   ${B.Ltot >= PB.L_MAX * 0.995 ? 'MAX' : 'Betrieb'}`, `f     ${f1(B.hz)} Hz`, `I     ${f0(B.amp)} A`, `P     ${f0(B.pkw)} kW`, '', 'G1.2  bereit  0,0 Hz'], { lcdH: 0.6, fs: 0.06 });
-        lamp(ctx, W * 0.2, Hc * 0.84, W * 0.04, '#00b894', true, 'G1.1', W);
-        lamp(ctx, W * 0.45, Hc * 0.84, W * 0.04, '#f1c40f', B.Ltot >= PB.L_MAX * 0.995, 'Grenze', W);
-        lamp(ctx, W * 0.7, Hc * 0.84, W * 0.04, '#00b894', false, 'G1.2', W);
-      } });
+        const B = sim.B, z = (i) => { const x = B.g[i]; return [`${GEB[i]}  ${MODI[x.mode].padEnd(8)} ${x.run ? 'läuft' : 'steht'}`, `  ${f1(x.hz)} Hz  ${f0(x.amp)} A  ${f0(x.pkw)} kW`]; };
+        lcd(ctx, W, Hc, 'FU Gebläsestation', [...z(0), '', ...z(1), '', `Sammelleitung ${f0(B.pD)} mbar`], { lcdH: 0.62, fs: 0.056 });
+        lamp(ctx, W * 0.2, Hc * 0.86, W * 0.04, '#00b894', B.g[0].run, 'G1.1', W);
+        lamp(ctx, W * 0.45, Hc * 0.86, W * 0.04, '#f1c40f', B.alarme.gmax?.aktiv, 'Grenze', W);
+        lamp(ctx, W * 0.7, Hc * 0.86, W * 0.04, '#00b894', B.g[1].run, 'G1.2', W);
+      },
+      actions: () => GEB.flatMap((nr, i) => [
+        { typ: 'titel', label: `Gebläse ${nr}` },
+        { typ: 'wahl', label: 'Betriebsart', wert: sim.B.g[i].mode, optionen: Object.entries(MODI), fn: (v) => gebMode(sim.B, i, v, logA) },
+        { typ: 'zahl', label: 'Hand-Frequenz', wert: sim.B.g[i].hzHand, min: 12.5, max: 50, einheit: 'Hz', fn: (v) => gebHz(sim.B, i, v, logA) },
+      ]) });
 
     reg('geblaese', g, { name: 'Gebläsestation', kks: 'G1.1 / G1.2 · FIC 201 · FU',
       text: 'Erzeugung der Prozessluft für die Nitrifikation. Die Sauerstoffregler der beiden Straßen geben die Luftmengen vor; das Gebläse liefert die Summe über die Drehzahl, die Regelklappen FV 301 / FV 311 verteilen sie (die am weitesten geöffnete Klappe steht bei ca. 88 %).',
@@ -84,13 +92,21 @@ export function buildBelueftung(scene, h, hooks = {}) {
     const g = new THREE.Group();
     pipe(g, [[21.4, 1.6, -15.2], [23.4, 1.6, -15.2]], 0.24, luftM);
     noCol(box(g, 0.12, 1.5, 0.12, M.steelDark, 22.4, 0, -15.2, 0, false));
+    noCol(box(g, 0.05, 0.3, 0.05, M.steelDark, 22.4, 1.6, -14.98, 0, false));
+    makeInst('pi202', { name: 'Manometer Sammelleitung', tag: 'PI 202', pos: [22.4, 2.05, -14.95], size: 0.26, round: true,
+      info: 'Druck in der Luftsammelleitung vor den Regelklappen. Er steigt, wenn Klappen schließen oder Belüfter verstopfen, und fällt, wenn Klappen weit öffnen.',
+      draw: (ctx, W) => gauge(ctx, W, { min: 0, max: 1000, ticks: 5, unit: 'mbar', tag: 'PI 202', val: sim.B.pD + noise(3, 11), red: [650, 1000] }) });
     STR.forEach((st, i) => {
       const x = i === 0 ? 21.6 : 23.2;
       pipe(g, [[x, 1.6, -15.2], [x, 1.6, -17.6], [x, 1.25, -18.2]], 0.16, luftM);
       { const m = cyl(g, 0.22, 0.22, 0.12, M.steelDark, x, 1.6, -16.4, 20); m.rotation.x = Math.PI / 2; m.position.y = 1.6; m.userData.noCol = true; }
       noCol(box(g, 0.28, 0.32, 0.24, std(0x2f6fa8, { r: 0.6, m: 0.3 }), x, 1.82, -16.4, 0, false));
       makeInst(`fv${i}`, { name: `Luftregelklappe ${st.name}`, tag: st.fv, pos: [x, 2.16, -16.27], size: 0.26, aspect: 0.9,
-        info: `Motorisch verstellte Absperrklappe in der Luftleitung zur ${st.name}. Die Stellungsanzeige zeigt den Öffnungsgrad (0 % = zu, 100 % = ganz offen).`,
+        info: `Motorisch verstellte Absperrklappe in der Luftleitung zur ${st.name}. FERN: Die Stellung ergibt sich aus der Sauerstoffregelung. ORT: Die Klappe bleibt in der vor Ort eingestellten Handstellung, der O₂-Regler hat dann keinen Einfluss.`,
+        actions: () => [
+          { typ: 'wahl', label: 'Steuerung', wert: sim.B.s[i].fv.ort ? 'ort' : 'fern', optionen: [['fern', 'FERN'], ['ort', 'ORT']], fn: (v) => fvOrt(sim.B, i, v === 'ort', logA) },
+          { typ: 'zahl', label: 'Handstellung (nur ORT)', wert: Math.round(sim.B.s[i].fv.pos), min: 0, max: 100, einheit: '%', fn: (v) => { fvPos(sim.B, i, v, logA); if (!sim.B.s[i].fv.ort) toast('Handstellung gespeichert – wirkt erst im ORT-Betrieb.'); } },
+        ],
         draw: (ctx, W, Hc) => {
           const k = sim.B.s[i].klappe;
           ctx.fillStyle = '#ecf0f1'; ctx.fillRect(0, 0, W, Hc);
@@ -100,6 +116,8 @@ export function buildBelueftung(scene, h, hooks = {}) {
           ctx.font = `${W * 0.08}px Arial`; ctx.fillText('ZU', cx - R, cy + 4); ctx.fillText('AUF', cx + R, cy + 4);
           const a = Math.PI + Math.PI * k / 100;
           ctx.strokeStyle = '#d63031'; ctx.lineWidth = W * 0.04; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(a) * R * 0.9, cy + Math.sin(a) * R * 0.9); ctx.stroke();
+          const ort = sim.B.s[i].fv.ort; ctx.fillStyle = ort ? '#e67e22' : '#00b894'; ctx.fillRect(W * 0.3, Hc * 0.8, W * 0.4, Hc * 0.16);
+          ctx.fillStyle = '#fff'; ctx.font = `bold ${W * 0.09}px Arial`; ctx.textBaseline = 'middle'; ctx.fillText(ort ? 'ORT' : 'FERN', W / 2, Hc * 0.88);
         } });
     });
     scene.add(g);
@@ -132,6 +150,7 @@ export function buildBelueftung(scene, h, hooks = {}) {
           ctx.fillStyle = '#dfe6e9'; ctx.font = `${W * 0.042}px Arial`;
           ctx.fillText(`Sonde: ${s.out ? 'gezogen (an Luft)' : 'im Becken'}`, W * 0.05, Hc * 0.42);
           ctx.fillText(`Regler ${st.qic}: ${s.ctrl.auto ? 'AUTO' : 'HAND'}`, W * 0.05, Hc * 0.5);
+          ctx.fillText(`Letzte Kalibrierung: bei ${Math.round(s.kalP)} hPa`, W * 0.05, Hc * 0.58);
           if (s.hand && sim.B.t - s.hand.t < 1800) {
             ctx.fillStyle = '#ffeaa7'; ctx.fillRect(W * 0.53, Hc * 0.06, W * 0.42, Hc * 0.3);
             ctx.fillStyle = '#2d3436'; ctx.font = `${W * 0.045}px Arial`; ctx.fillText('Handmessgerät', W * 0.56, Hc * 0.09);
@@ -154,7 +173,7 @@ export function buildBelueftung(scene, h, hooks = {}) {
           a.push({ label: s.out ? 'Sonde wieder einsetzen' : 'Sonde aus dem Becken ziehen', fn: () => sondeZiehen(sim.B, i, log) });
           if (s.out) {
             a.push({ label: 'Membran reinigen', fn: () => toast(sondeReinigen(sim.B, i, log)) });
-            a.push({ label: `Luftkalibrierung (Sollwert ${f1(csWert())} mg/L)`, fn: () => toast(sondeKalibrieren(sim.B, i, log)) });
+            a.push({ typ: 'zahl', label: 'Luftkalibrierung bei Luftdruck', wert: 1013, min: 850, max: 1100, einheit: 'hPa', knopf: 'Kalibrieren', fn: (v) => toast(sondeKalibrieren(sim.B, i, v, log)) });
           }
           return a;
         } });
