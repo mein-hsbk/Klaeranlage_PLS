@@ -13,10 +13,10 @@ export function sammleBericht(m, ctx) {
   const tEnd = sim.S.t, tStart = ctx.tSim0;
   const ereignisse = sim.log.filter((l) => ['aktion', 'messung', 'meldung'].includes(l.art)).map((l, i) => ({ ...l, nr: i + 1 }));
   const alarme = sim.log.filter((l) => l.art === 'alarm');
-  const checks = (m.checks || []).map(([text, f, warum]) => ({ text, ok: !!f(), warum: warum || '' }));
+  const checks = ((typeof m.checks === 'function' ? m.checks() : m.checks) || []).map(([text, f, warum]) => ({ text, ok: !!f(), warum: warum || '' }));
   const ende = m.werte ? m.werte() : [];
   const werte = (ctx.werteStart || []).map(([n, v, u], i) => [n, v, ende[i] ? ende[i][1] : '–', u]);
-  const hist = { S: [...sim.S.hist, { t: tEnd, ...lastS() }], B: [...sim.B.hist, { t: tEnd, ...lastB() }] };
+  const hist = { S: [...sim.S.hist, { t: tEnd, ...lastS() }], B: [...sim.B.hist, { t: tEnd, ...lastB() }], P: [...sim.P.hist, { t: tEnd, ...lastP() }] };
   return {
     titel: m.titel, bereich: m.bereich, name: ctx.name || '', datum: new Date().toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'short' }),
     dauer: mmss(performance.now() - ctx.t0), simVon: zeit(tStart), simBis: zeit(tEnd), speed: sim.speed, exam: ctx.exam,
@@ -24,10 +24,11 @@ export function sammleBericht(m, ctx) {
     charts: (m.charts || []).map((c) => ({ ...c, t0: tStart - (m.vorlauf || 2) * 3600, t1: tEnd, tStart, data: hist[c.src] })),
     hinweise: m.hinweise ? m.hinweise(ereignisse) : [], ereignisse, alarme,
     meldungen: ereignisse.filter((e) => e.art === 'meldung').map((e) => e.text.replace(/^MELDUNG an Schichtleitung: /, '')),
-    lehrer: m.lehrer,
+    lehrer: m.lehrerBericht ? m.lehrerBericht() : m.lehrer,
   };
 }
 function lastS() { const S = sim.S; return { lvl: S.V / 6, q: S.qProd, pel: S.pel, T: S.T_ft, ch4: S.ch4, f: S.fackel ? 1 : 0 }; }
+function lastP() { const P = sim.P; return { li: P.li, q: P.q, q1: P.p[0].q, q2: P.p[1].q, i1: P.p[0].amp, i2: P.p[1].amp, v1: P.p[0].v, vor: P.p[0].vorlage }; }
 function lastB() { const B = sim.B; return { m1: B.s[0].meas, m2: B.s[1].meas, o1: B.s[0].o2, o2: B.s[1].o2, l1: B.s[0].L, l2: B.s[1].L, p: B.pkw, pr: B.pref, nh4: B.nh4 }; }
 
 // ------------------------------------------------------------------ Diagramm (Bildschirm und PDF)
