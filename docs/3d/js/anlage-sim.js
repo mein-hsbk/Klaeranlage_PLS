@@ -54,8 +54,8 @@ function run(dt) { let r = dt; while (r > 0) { const d = Math.min(30, r); stepAl
 // Pumpwerk auf die gemeinsame Simulationszeit verschieben (Verlauf und Meldungen mit)
 function syncPW(P, t) { const d = t - P.t; P.t = t; P.histNext += d; P.hist.forEach((h) => { h.t += d; }); }
 
-export function startSzenario({ faul = 'S0', bel = 'B0', pw = null, speed, titel } = {}) {
-  sim.S = setupFaul(faul); sim.B = setupBel(bel); sim.P = setupPW(pw); sim.diagnose = null;
+export function startSzenario({ faul = 'S0', bel = 'B0', pw = null, pwOpt = {}, speed, titel } = {}) {
+  sim.S = setupFaul(faul); sim.B = setupBel(bel); sim.P = setupPW(pw, pwOpt); sim.diagnose = null;
   sim.B.t = sim.S.t; syncPW(sim.P, sim.S.t);
   sim.speed = speed ?? sim.speed; sim.log.length = 0; sim.t0real = performance.now();
   logSys(`Start ${titel || `Szenario ${faul}/${bel}`} · Zeitraffer ×${sim.speed}`);

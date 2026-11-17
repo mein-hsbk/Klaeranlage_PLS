@@ -4,7 +4,7 @@ import { sim, startSzenario, logText, logA } from './anlage-sim.js';
 import { P } from './faulung-modell.js';
 import { f0, f1 } from './instrumente.js';
 import { sammleBericht, renderBericht, berichtAlsPDF } from './bericht.js';
-import { KARTEN, VOR_ORT_BEHEBBAR } from './pumpwerk-modell.js';
+import { KARTEN, VOR_ORT_BEHEBBAR, TEILE, SCHADTEIL, wsRepariert } from './pumpwerk-modell.js';
 
 const $ = (id) => document.getElementById(id);
 const hat = (re) => sim.log.some((l) => re.test(l.text));
@@ -49,65 +49,96 @@ const LOESUNG = {
   stopfen: 'Verschraubung am Vorlagebehälter locker: Tropfen an der Verschraubung, Vorlagestand unter MIN. Vor Ort behebbar: Verschraubung nachziehen und Vorlageflüssigkeit nachfüllen.',
   gehaeuse: 'Gehäusedichtung am Gehäusedeckel undicht: Abwasser tritt am Gehäusedeckel aus, Pfütze; Vorlagebehälter unauffällig. Außerbetriebnahme, Gehäusedichtung in der Werkstatt erneuern.',
 };
-const pidx = (re) => sim.log.findIndex((l) => re.test(l.text));
+const pidx = (re, ab = 0) => { const i = sim.log.slice(ab).findIndex((l) => re.test(l.text)); return i < 0 ? -1 : i + ab; };
+const U0 = () => sim.P.ursache0;
 function pwBehoben() {
-  const P = sim.P, x = P.p[0], u = P.ursache;
+  const P = sim.P, x = P.p[0], u = U0();
   if (u === 'schieber') return x.vd >= 95;
   if (u === 'saug') return x.vs >= 95;
   if (u === 'luft') return P.liAus >= 0.7 && P.liAus <= 1.0;
   if (u === 'stopfen') return !!x.stopfenFest && x.vorlage >= 40 && x.vorlage <= 75;
   return false;
 }
-function pwChecks() {
-  const P = sim.P, k = P.karte, u = P.ursache, x1 = P.p[0], x2 = P.p[1], fix = VOR_ORT_BEHEBBAR.includes(u), c = [];
-  if (k === 'K1') {
-    c.push(['Förderstrom und Drücke vor Ort abgelesen (FI-001, PI 001.1, PI 001.2)', () => hat(/angesehen: FI-001/) && hat(/angesehen: PI 001\.1/) && hat(/angesehen: PI 001\.2/), 'Aus Saug- und Druckmanometer ergibt sich die Förderhöhe; zusammen mit dem Förderstrom lässt sich der Betriebspunkt mit der Kennlinie vergleichen.']);
-    c.push(['Stellung von Saug- und Druckschieber geprüft', () => hat(/angesehen: V-001\.1/) && hat(/angesehen: V-001\.2/), 'Ein nicht ganz geöffneter Schieber ist die einfachste Ursache und schnell auszuschließen.']);
-  } else if (k === 'K2') {
-    c.push(['Vorlagebehälter der Gleitringdichtung begutachtet', () => hat(/angesehen: LG 001/), 'Stand und Farbe der Vorlageflüssigkeit zeigen, welche der beiden Dichtungen undicht ist.']);
-    c.push(['Störungsspeicher der Pumpensteuerung angesehen', () => hat(/angesehen: PW-Steuerung/), 'Ein vorausgegangener Trockenlauf ist eine typische Ursache für Gleitringdichtungsschäden – er steht im Störungsspeicher.']);
-  } else if (k === 'K3') {
-    c.push(['Pumpe P-001 abgehört', () => hat(/P-001 abgehört/), 'Geräuschbild (Prasseln, Schlürfen, Mahlen, Klopfen, Klappern) grenzt die Ursache ein.']);
-    c.push(['Schwingung und Lagertemperatur von P-001 gemessen', () => hat(/P-001 Schwingschnelle/) && hat(/P-001 Lagertemperatur/), 'Messwerte statt Eindruck: Schwingschnelle nach DIN ISO 10816-3, Lagertemperatur über 80 °C deutet auf Lagerschaden.']);
-    c.push(['Pegel bzw. Pumpensteuerung geprüft', () => hat(/angesehen: (PW-Steuerung|Pumpensumpf)/), 'Lufteinzug durch zu tiefen Pegel erzeugt ebenfalls laute Geräusche – die Ursache liegt dann nicht an der Pumpe.']);
-  } else if (k === 'K4') {
-    c.push(['Sichtprüfung an Pumpe und Dichtung', () => hat(/P-001 Sichtprüfung/), 'Die Austrittsstelle (Gehäusedeckel, Dichtungsgehäuse, Verschraubung) entscheidet über die Ursache.']);
-    c.push(['Vorlagebehälter der Gleitringdichtung begutachtet', () => hat(/angesehen: LG 001/), 'Fällt der Stand, geht Vorlageflüssigkeit nach außen verloren; ist er normal, kommt die Leckage nicht von der Gleitringdichtung.']);
-  }
-  c.push(['Ursache richtig festgestellt (Auswahl in der Meldung)', () => sim.diagnose === u, 'Die Diagnose bestimmt, ob vor Ort behoben werden kann oder die Pumpe in die Werkstatt muss.']);
-  if (fix) {
-    c.push(['Ursache vor Ort beseitigt', pwBehoben, 'Die Ursache lag nicht an der Pumpe selbst und konnte ohne Werkstatt behoben werden.']);
-    c.push(['P-001 wieder in AUTO und betriebsbereit', () => x1.wahl === 'auto' && x1.rep && !x1.stoer && x1.vs > 95 && x1.vd > 95, 'Nach der Beseitigung muss die Führungspumpe wieder im Automatikbetrieb laufen.']);
-    c.push(['Reservepumpe P-002 betriebsbereit (AUTO, Reparaturschalter EIN, beide Schieber offen)', () => x2.wahl === 'auto' && x2.rep && !x2.stoer && x2.vs > 95 && x2.vd > 95, 'Zum Kontrollgang gehört auch die Reserve: Sie muss jederzeit übernehmen können.']);
-  } else {
-    c.push(['Reservepumpe P-002 betriebsbereit (AUTO, Reparaturschalter EIN, beide Schieber offen)', () => x2.wahl === 'auto' && x2.rep && !x2.stoer && x2.vs > 95 && x2.vd > 95, 'Erst wenn die Reserve sicher fördert, darf die gestörte Pumpe außer Betrieb gehen.']);
-    c.push(['P-002 hat nachweislich gefördert (≥ 100 m³/h)', () => x2.qMax >= 100, 'Kontrolle an FI-001 und am Druckmanometer: Läuft die Reserve auch wirklich?']);
-    c.push(['P-001 am Wahlschalter abgeschaltet, bevor der Reparaturschalter betätigt wurde', () => hat(/P-001 Reparaturschalter AUS/) && !hat(/P-001 Reparaturschalter AUS \(0\) – Pumpe lief noch/), 'Der Reparaturschalter ist ein Lasttrennschalter zum Sichern, kein Betriebsschalter.']);
-    c.push(['Reparaturschalter P-001 auf 0 und mit Vorhängeschloss gesichert', () => !x1.rep && x1.schloss, '2. Sicherheitsregel: gegen Wiedereinschalten sichern.']);
-    c.push(['Wirksamkeit der Freischaltung geprüft (Einschaltversuch)', () => hat(/P-001 Einschaltversuch \(Wahlschalter HAND\): Pumpe läuft nicht an/), 'Sinngemäß 3. Sicherheitsregel: Erst ein Einschaltversuch zeigt, dass wirklich der richtige Antrieb freigeschaltet ist.']);
-    c.push(['Erst Druck-, dann Saugschieber geschlossen', () => { const d = pidx(/P-001 Druckschieber \d+ → 0 %/), sg = pidx(/P-001 Saugschieber \d+ → 0 %/); return x1.vd <= 2 && x1.vs <= 2 && d >= 0 && sg > d; }, 'Der Druckschieber trennt die Pumpe vom Druck der Leitung; danach wird saugseitig abgesperrt.']);
-    c.push(['Pumpe über die Entleerung drucklos gemacht, ohne Abwasseraustritt', () => x1.ablass && P.flut < 0.5, 'Erst nach dem Schließen beider Schieber entleeren – sonst läuft der Raum voll.']);
-  }
-  c.push(['Kein Trockenlauf ausgelöst', () => !hat(/Abschaltung durch Trockenlaufschutz/), 'Trockenlauf zerstört die Gleitringdichtung in kurzer Zeit.']);
-  c.push(['Kein Notüberlauf während des Einsatzes', () => P.vUeb < 0.5, 'Ein Abschlag ungereinigten Abwassers ins Gewässer ist meldepflichtig.']);
-  c.push(['Meldung an die Schichtleitung abgegeben', () => hat(/^MELDUNG an Schichtleitung/), 'Befund, festgestellte Ursache, Maßnahmen, Zustand der Pumpen und ggf. Auftrag an die Werkstatt.']);
-  return c;
+const bereit2 = () => { const x = sim.P.p[1]; return x.wahl === 'auto' && x.rep && !x.stoer && x.vs > 95 && x.vd > 95; };
+// Prüfschritte, nach Abschnitten
+function chkSymptom(k) {
+  if (k === 'K1') return [['Förderstrom und Drücke vor Ort abgelesen (FI-001, PI 001.1, PI 001.2)', () => hat(/angesehen: FI-001/) && hat(/angesehen: PI 001\.1/) && hat(/angesehen: PI 001\.2/), 'Aus Saug- und Druckmanometer ergibt sich die Förderhöhe; zusammen mit dem Förderstrom lässt sich der Betriebspunkt mit der Kennlinie vergleichen.'],
+    ['Stellung von Saug- und Druckschieber geprüft', () => hat(/angesehen: V-001\.1/) && hat(/angesehen: V-001\.2/), 'Ein nicht ganz geöffneter Schieber ist die einfachste Ursache und schnell auszuschließen.']];
+  if (k === 'K2') return [['Vorlagebehälter der Gleitringdichtung begutachtet', () => hat(/angesehen: LG 001/), 'Stand und Farbe der Vorlageflüssigkeit zeigen, welche der beiden Dichtungen undicht ist.'],
+    ['Störungsspeicher der Pumpensteuerung angesehen', () => hat(/angesehen: PW-Steuerung/), 'Ein vorausgegangener Trockenlauf ist eine typische Ursache für Gleitringdichtungsschäden – er steht im Störungsspeicher.']];
+  if (k === 'K3') return [['Pumpe P-001 abgehört', () => hat(/P-001 abgehört/), 'Geräuschbild (Prasseln, Schlürfen, Mahlen, Klopfen, Klappern) grenzt die Ursache ein.'],
+    ['Schwingung und Lagertemperatur von P-001 gemessen', () => hat(/P-001 Schwingschnelle/) && hat(/P-001 Lagertemperatur/), 'Messwerte statt Eindruck: Schwingschnelle nach DIN ISO 10816-3, Lagertemperatur über 80 °C deutet auf Lagerschaden.'],
+    ['Pegel bzw. Pumpensteuerung geprüft', () => hat(/angesehen: (PW-Steuerung|Pumpensumpf)/), 'Lufteinzug durch zu tiefen Pegel erzeugt ebenfalls laute Geräusche – die Ursache liegt dann nicht an der Pumpe.']];
+  return [['Sichtprüfung an Pumpe und Dichtung', () => hat(/P-001 Sichtprüfung/), 'Die Austrittsstelle (Gehäusedeckel, Dichtungsgehäuse, Verschraubung) entscheidet über die Ursache.'],
+    ['Vorlagebehälter der Gleitringdichtung begutachtet', () => hat(/angesehen: LG 001/), 'Fällt der Stand, geht Vorlageflüssigkeit nach außen verloren; ist er normal, kommt die Leckage nicht von der Gleitringdichtung.']];
 }
-const zust = (x) => x.stoer ? `Störung (${x.stoer})` : !x.rep ? `Rep.-Sch. 0${x.schloss ? ', gesichert' : ''}` : x.run ? `Betrieb, ${({ hand: 'HAND', '0': '0', auto: 'AUTO' })[x.wahl]}` : `bereit, ${({ hand: 'HAND', '0': '0', auto: 'AUTO' })[x.wahl]}`;
-function pwMission(karte, zufall = false) {
+const chkDiagnose = () => [['Ursache richtig festgestellt (Auswahl in der Meldung)', () => sim.diagnose === U0(), 'Die Diagnose bestimmt, ob vor Ort behoben werden kann oder die Pumpe in die Werkstatt muss.']];
+const chkVorOrt = () => { const x1 = sim.P.p[0]; return [
+  ['Ursache vor Ort beseitigt', pwBehoben, 'Die Ursache lag nicht an der Pumpe selbst und konnte ohne Werkstatt behoben werden.'],
+  ['P-001 wieder in AUTO und betriebsbereit', () => x1.wahl === 'auto' && x1.rep && !x1.stoer && x1.vs > 95 && x1.vd > 95, 'Nach der Beseitigung muss die Führungspumpe wieder im Automatikbetrieb laufen.'],
+  ['Reservepumpe P-002 betriebsbereit (AUTO, Reparaturschalter EIN, beide Schieber offen)', bereit2, 'Zum Kontrollgang gehört auch die Reserve: Sie muss jederzeit übernehmen können.']]; };
+const chkAusser = () => { const P = sim.P, x1 = P.p[0], x2 = P.p[1]; return [
+  ['Reservepumpe P-002 betriebsbereit (AUTO, Reparaturschalter EIN, beide Schieber offen)', bereit2, 'Erst wenn die Reserve sicher fördert, darf die gestörte Pumpe außer Betrieb gehen.'],
+  ['P-002 hat nachweislich gefördert (≥ 100 m³/h)', () => x2.qMax >= 100, 'Kontrolle an FI-001 und am Druckmanometer: Läuft die Reserve auch wirklich?'],
+  ['P-001 am Wahlschalter abgeschaltet, bevor der Reparaturschalter betätigt wurde', () => hat(/P-001 Reparaturschalter AUS/) && !hat(/P-001 Reparaturschalter AUS \(0\) – Pumpe lief noch/), 'Der Reparaturschalter ist ein Lasttrennschalter zum Sichern, kein Betriebsschalter.'],
+  ['Reparaturschalter P-001 auf 0 und mit Vorhängeschloss gesichert', () => hat(/P-001 Reparaturschalter mit Vorhängeschloss/), '2. Sicherheitsregel: gegen Wiedereinschalten sichern.'],
+  ['Wirksamkeit der Freischaltung geprüft (Einschaltversuch)', () => hat(/P-001 Einschaltversuch \(Wahlschalter HAND\): Pumpe läuft nicht an/), 'Sinngemäß 3. Sicherheitsregel: Erst ein Einschaltversuch zeigt, dass wirklich der richtige Antrieb freigeschaltet ist.'],
+  ['Erst Druck-, dann Saugschieber geschlossen', () => { const d = pidx(/P-001 Druckschieber \d+ → 0 %/), sg = pidx(/P-001 Saugschieber \d+ → 0 %/); return d >= 0 && sg > d; }, 'Der Druckschieber trennt die Pumpe vom Druck der Leitung; danach wird saugseitig abgesperrt.'],
+  ['Pumpe über die Entleerung drucklos gemacht, ohne Abwasseraustritt', () => hat(/P-001 Entleerung geöffnet/) && !hat(/P-001 Entleerung geöffnet – ACHTUNG/), 'Erst nach dem Schließen beider Schieber entleeren – sonst läuft der Raum voll.']]; };
+const einbauIdx = () => pidx(/P-001 Einschubeinheit wieder eingebaut/);
+const nachEinbau = (re) => { const e = einbauIdx(); return e >= 0 && pidx(re, e) > e; };
+const chkWerkstatt = () => { const P = sim.P, ws = () => P.ws, sch = () => SCHADTEIL[P.wsUrsache]; return [
+  ['Befund am schadhaften Bauteil aufgenommen', () => ws() && ws().teile[sch()] && ws().teile[sch()].befund, 'Der Befund am Bauteil bestätigt die Diagnose und gehört in den Instandsetzungsbericht.'],
+  ['Schadhaftes Bauteil fachgerecht instand gesetzt', () => ws() && wsRepariert(P), 'Erst wenn das schadhafte Teil gereinigt bzw. ersetzt ist, ist die Ursache beseitigt.'],
+  ['Kein Teil ohne Befund ersetzt', () => ws() && TEILE.every((T) => !ws().teile[T.id].ersetzt || ws().teile[T.id].befund || T.id === 'gdicht'), 'Erst prüfen, dann tauschen – sonst bleibt die Ursache unter Umständen unerkannt.'],
+  ['Keine unnötigen Neuteile', () => ws() && TEILE.every((T) => !ws().teile[T.id].ersetzt || T.id === sch() || T.id === 'gdicht'), 'Neuteile kosten Geld; intakte Teile werden wieder verwendet. Ausnahme: Flachdichtungen.'],
+  ['Gehäusedichtung erneuert', () => ws() && ws().teile.gdicht.ersetzt, 'Flachdichtungen werden nach jeder Demontage erneuert – eine gebrauchte Dichtung dichtet nicht zuverlässig.'],
+  ['Einschubeinheit wieder eingebaut', () => ws() && ws().eingebaut, ''],
+]; };
+const chkWiB = () => { const P = sim.P, x1 = P.p[0]; return [
+  ['Entleerung geschlossen, bevor die Schieber geöffnet wurden', () => { const e = einbauIdx(), a = pidx(/P-001 Entleerung geschlossen/, e), s1 = pidx(/P-001 (Saug|Druck)schieber 0 → [1-9]/, e); return e >= 0 && a > e && s1 > a; }, 'Sonst läuft Abwasser aus Sumpf oder Druckleitung über die offene Entleerung in den Pumpenraum.'],
+  ['Vorlagebehälter vor dem Anlauf befüllt', () => einbauIdx() >= 0 && !hat(/läuft mit leerem Vorlagebehälter/) && x1.vorlage >= 40, 'Nach einem Dichtungstausch ist der Vorlageraum leer; ohne Vorlageflüssigkeit läuft die atmosphärenseitige Dichtung trocken.'],
+  ['Saug- und Druckschieber wieder ganz geöffnet', () => x1.vs > 95 && x1.vd > 95, 'Gedrosselte Schieber führen zu Kavitation (saugseitig) bzw. zu geringem Förderstrom.'],
+  ['Schloss entfernt, Reparaturschalter EIN, Wahlschalter AUTO', () => !x1.schloss && x1.rep && x1.wahl === 'auto', 'Nur im AUTO-Betrieb übernimmt P-001 wieder die Niveausteuerung als Führungspumpe.'],
+  ['Probelauf: P-001 fördert wieder mindestens 100 m³/h', () => einbauIdx() >= 0 && x1.qMax >= 100, 'Kontrolle an FI-001: Erreicht die Pumpe wieder ihren Betriebspunkt?'],
+  ['Probelauf: Schwingung gemessen und unter 2,8 mm/s', () => { const e = einbauIdx(); if (e < 0) return false; const l = sim.log.slice(e).filter((x) => /P-001 Schwingschnelle am Lagerträger: ([\d,]+)/.test(x.text)).pop(); return !!l && parseFloat(l.text.match(/: ([\d,]+) mm/)[1].replace(',', '.')) < 2.8; }, 'Eine Schwingungsmessung nach der Instandsetzung belegt den einwandfreien Lauf (Zone A nach DIN ISO 10816-3).'],
+]; };
+const chkEnde = () => { const P = sim.P; return [
+  ['Kein Trockenlauf ausgelöst', () => !hat(/Abschaltung durch Trockenlaufschutz/) && !hat(/läuft mit leerem Vorlagebehälter/), 'Trockenlauf zerstört Gleitringdichtungen in kurzer Zeit.'],
+  ['Kein Notüberlauf während des Einsatzes', () => P.vUeb < 0.5, 'Ein Abschlag ungereinigten Abwassers ins Gewässer ist meldepflichtig.'],
+  ['Meldung an die Schichtleitung abgegeben', () => hat(/^MELDUNG an Schichtleitung/), 'Befund, festgestellte Ursache, Maßnahmen, Zustand der Pumpen und ggf. Ersatzteile.']]; };
+function pwChecks(art) {
+  const P = sim.P, fix = VOR_ORT_BEHEBBAR.includes(U0());
+  if (art === 'werkstatt') return [...chkDiagnose(), ...chkWerkstatt(), ...chkWiB(), ...chkEnde()];
+  const c = [...chkSymptom(P.karte), ...chkDiagnose()];
+  if (fix) return [...c, ...chkVorOrt(), ...chkEnde()];
+  return [...c, ...chkAusser(), ...(art === 'komplett' ? [...chkWerkstatt(), ...chkWiB()] : []), ...chkEnde()];
+}
+const zust = (x) => x.ausgebaut ? 'ausgebaut (Werkstatt)' : x.stoer ? `Störung (${x.stoer})` : !x.rep ? `Rep.-Sch. 0${x.schloss ? ', gesichert' : ''}` : x.run ? `Betrieb, ${({ hand: 'HAND', '0': '0', auto: 'AUTO' })[x.wahl]}` : `bereit, ${({ hand: 'HAND', '0': '0', auto: 'AUTO' })[x.wahl]}`;
+const REIHENFOLGE_AUS = 'Reserve P-002 prüfen (Wahlschalter AUTO, Reparaturschalter EIN, Schieber offen) – P-001 Wahlschalter 0 – P-002 übernimmt, Förderung an FI-001 kontrollieren – Reparaturschalter P-001 auf 0, Schloss – Einschaltversuch – Druckschieber zu – Saugschieber zu – Entleerung öffnen';
+const REIHENFOLGE_WIB = 'Wiederinbetriebnahme: Entleerung schließen – Vorlagebehälter befüllen (nach Dichtungstausch) – Saugschieber öffnen (Pumpe füllt sich) – Druckschieber öffnen – Schloss entfernen, Reparaturschalter EIN – Wahlschalter AUTO – Probelauf: Förderstrom an FI-001, Schwingung messen.';
+const WERKSTATT_LOES = { zopf: 'Laufrad reinigen (Zopf entfernen); Neuteil nicht nötig.', fremd: 'Laufrad ersetzen (Schaufelkante ausgebrochen, Unwucht).', spalt: 'Verschleißwand/Spaltring erneuern (Spalt 2,4 mm statt 0,3–0,5 mm).', glrd: 'Produktseitige Gleitringdichtung erneuern.', oring: 'Produktseitige Gleitringdichtung (inkl. O-Ringe) erneuern.', trocken: 'Produktseitige Gleitringdichtung erneuern; Ursache des Trockenlaufs (Pegel, Trockenlaufschutz) klären.', aussen: 'Atmosphärenseitige Gleitringdichtung erneuern.', gehaeuse: 'Gehäusedichtung erneuern.', lager: 'Beide Wälzlager erneuern und mit Fett befüllen.', kupplung: 'Elastomerkranz der Kupplung erneuern, Ausrichtung prüfen.' };
+
+function pwMission(karte, art = 'karte') {
+  const zufall = art !== 'karte', ziel = art === 'werkstatt'
+    ? 'Die Einschubeinheit von P-001 liegt bereits in der Werkstatt, P-002 fördert. Zerlege die Einheit, finde das schadhafte Bauteil, setze es instand und baue P-001 wieder ein. Nimm P-001 fachgerecht wieder in Betrieb (Probelauf mit Schwingungsmessung) und gib eine Meldung mit der festgestellten Ursache ab.'
+    : `Stelle die Ursache fest. Kann sie vor Ort beseitigt werden, tu das. Sonst nimm die baugleiche Reservepumpe P-002 sicher in Betrieb und nimm P-001 fachgerecht außer Betrieb.${art === 'komplett' ? ' Baue dann die Einschubeinheit aus, setze sie in der Werkstatt instand und nimm P-001 wieder in Betrieb.' : ''} Gib eine Meldung mit der festgestellten Ursache an die Schichtleitung ab.`;
+  const titel = { karte: `Pumpwerk: ${KARTEN[karte].kurz}`, zufall: 'Störung Kreiselpumpe (Zufallskarte)', komplett: 'Pumpe: Störung bis Wiederinbetriebnahme', werkstatt: 'Pumpe instand setzen (Werkstatt)' }[art];
+  const symptom = art === 'werkstatt' ? `P-001 wurde heute früh außer Betrieb genommen. Meldung des Frühdienstes: ${SYMPTOM[karte].replace('Die Leitwarte meldet', 'Die Leitwarte meldete').replace('Ein Kollege berichtet', 'Ein Kollege berichtete')}` : `Routinekontrolle im Abwasserpumpwerk Talstraße. ${SYMPTOM[karte]}`;
   return {
-    id: zufall ? 'pw_zufall' : `pw_${karte}`, titel: zufall ? 'Störung Kreiselpumpe (Zufallskarte)' : `Pumpwerk: ${KARTEN[karte].kurz}`, karte, pw: karte, faul: 'S0', bel: 'B0',
-    bereich: 'Pumpwerk Talstraße · Instandhaltung', dauer: '30–45 min', stufe: 3, start: 'talstr', tab: 'pw', vorlauf: 2, speed: 5,
-    auftrag: zufall ? 'Bei der Routinekontrolle im Abwasserpumpwerk Talstraße fällt eine Störung an der Führungspumpe P-001 auf (eine zufällige Störungskarte wird beim Start gezogen). Stelle die Ursache fest. Kann sie vor Ort beseitigt werden, tu das. Sonst nimm die baugleiche Reservepumpe P-002 sicher in Betrieb und nimm P-001 fachgerecht für die Werkstatt außer Betrieb. Gib eine Meldung mit der festgestellten Ursache an die Schichtleitung ab.'
-      : `Routinekontrolle im Abwasserpumpwerk Talstraße. ${SYMPTOM[karte]} Stelle die Ursache fest. Kann sie vor Ort beseitigt werden, tu das. Sonst nimm die baugleiche Reservepumpe P-002 sicher in Betrieb und nimm P-001 fachgerecht für die Werkstatt außer Betrieb. Gib eine Meldung mit der festgestellten Ursache an die Schichtleitung ab.`,
-    lehrer: `Die Ursache wird bei jedem Start zufällig gezogen (der Bericht nennt sie). ${zufall ? 'Karten: ' + Object.entries(KARTEN).map(([k, v]) => `${k} ${v.titel}`).join(' · ') + '. ' : `Mögliche Ursachen: ${Object.values(KARTEN[karte].ursachen).join(' · ')}. `}Vor Ort behebbar sind gedrosselte Schieber, der verstellte Ausschaltpegel und die lockere Verschraubung am Vorlagebehälter; alle anderen Ursachen erfordern die Außerbetriebnahme (Stufe 2: Werkstatt). Fachgerechte Reihenfolge: Reserve P-002 prüfen (Wahlschalter AUTO, Reparaturschalter EIN, Schieber offen) – P-001 Wahlschalter 0 – P-002 übernimmt, Förderung an FI-001 kontrollieren – Reparaturschalter P-001 auf 0, Schloss – Einschaltversuch – Druckschieber zu – Saugschieber zu – Entleerung öffnen – Meldung. Falle: In etwa einem Drittel der Starts ist der Druckschieber der Reservepumpe nach der Wartung von vorgestern geschlossen geblieben; P-002 läuft dann gegen den geschlossenen Schieber, der Sumpf läuft in wenigen Minuten (×5) bis zum Notüberlauf voll. Fehlbedienungen mit Folgen: Saugschieber bei laufender Pumpe schließen oder HAND bei tiefem Pegel (Trockenlauf), Entleerung bei offenen Schiebern (Wassermelder).`,
-    lehrerBericht() { const P = sim.P; return `Gezogen: ${KARTEN[P.karte].titel} – Ursache: ${KARTEN[P.karte].ursachen[P.ursache]}. ${LOESUNG[P.ursache]} ${P.falle ? 'Falle aktiv: Der Druckschieber V-002.2 der Reservepumpe war geschlossen.' : 'Die Reservepumpe war in Ordnung.'} ${this.lehrer}`; },
-    checks: pwChecks,
-    werte: () => { const P = sim.P; return [['Pegel LI-001', P.li.toFixed(2).replace('.', ','), 'm'], ['Förderstrom FI-001', f0(P.q), 'm³/h'], ['P-001', zust(P.p[0]), ''], ['P-002', zust(P.p[1]), ''], ['Vorlagebehälter P-001', f0(P.p[0].vorlage), '%'], ['Notüberlauf seit Start', f0(P.vUeb), 'm³']]; },
+    id: { karte: `pw_${karte}`, zufall: 'pw_zufall', komplett: 'pw_komplett', werkstatt: 'pw_werkstatt' }[art], titel, karte, pw: karte, pwOpt: { werkstatt: art === 'werkstatt' }, art, faul: 'S0', bel: 'B0',
+    bereich: art === 'werkstatt' ? 'Pumpwerk Talstraße · Werkstatt' : 'Pumpwerk Talstraße · Instandhaltung', dauer: art === 'komplett' ? '60–90 min' : '30–45 min', stufe: 3, start: 'talstr', tab: 'pw', vorlauf: 2, speed: 5,
+    auftrag: zufall ? `${art === 'werkstatt' ? 'Eine zufällige Störungskarte wird beim Start gezogen und im Auftrag genannt. ' : 'Bei der Routinekontrolle im Abwasserpumpwerk Talstraße fällt eine Störung an der Führungspumpe P-001 auf (eine zufällige Störungskarte wird beim Start gezogen). '}${ziel}` : `${symptom} ${ziel}`,
+    auftragStart: `${symptom} ${ziel}`,
+    werkstattStart: art === 'werkstatt',
+    lehrer: `Die Ursache wird bei jedem Start zufällig gezogen (der Bericht nennt sie). ${art === 'karte' ? `Mögliche Ursachen: ${Object.values(KARTEN[karte].ursachen).join(' · ')}. ` : 'Karten: ' + Object.entries(KARTEN).map(([k, v]) => `${k} ${v.titel}`).join(' · ') + '. '}${art === 'werkstatt' ? 'Gezogen werden nur Ursachen an der Pumpe selbst. ' : 'Vor Ort behebbar sind gedrosselte Schieber, der verstellte Ausschaltpegel und die lockere Verschraubung am Vorlagebehälter; alle anderen Ursachen erfordern die Außerbetriebnahme. '}${art !== 'werkstatt' ? `Fachgerechte Reihenfolge: ${REIHENFOLGE_AUS} – Meldung. Falle: In etwa einem Drittel der Starts ist der Druckschieber der Reservepumpe nach der Wartung von vorgestern geschlossen geblieben; P-002 läuft dann gegen den geschlossenen Schieber, der Sumpf läuft in wenigen Minuten (×5) bis zum Notüberlauf voll. ` : ''}${art !== 'karte' && art !== 'zufall' ? `Werkstatt (Rückziehbauweise, Spiralgehäuse bleibt eingebaut): zerlegen, Befund aufnehmen, messen (Spaltmaß, Rundlauf, Lagerspiel), nur das schadhafte Teil ersetzen bzw. reinigen, Gehäusedichtung immer erneuern. ${REIHENFOLGE_WIB} Nach einem Dichtungstausch ist der Vorlagebehälter leer – Anlauf ohne Befüllen beschädigt die atmosphärenseitige Dichtung. ` : ''}Fehlbedienungen mit Folgen: Saugschieber bei laufender Pumpe schließen oder HAND bei tiefem Pegel (Trockenlauf), Entleerung bei offenen Schiebern (Wassermelder).`,
+    lehrerBericht() { const P = sim.P, u = U0(); return `Gezogen: ${KARTEN[P.karte].titel} – Ursache: ${KARTEN[P.karte].ursachen[u]}. ${LOESUNG[u]}${WERKSTATT_LOES[u] && art !== 'karte' && art !== 'zufall' ? ` Werkstatt: ${WERKSTATT_LOES[u]}` : ''} ${P.falle ? 'Falle aktiv: Der Druckschieber V-002.2 der Reservepumpe war geschlossen.' : ''} ${this.lehrer}`; },
+    checks: () => pwChecks(art),
+    werte: () => { const P = sim.P; return [['Pegel LI-001', P.li.toFixed(2).replace('.', ','), 'm'], ['Förderstrom FI-001', f0(P.q), 'm³/h'], ['P-001', zust(P.p[0]), ''], ['P-002', zust(P.p[1]), ''], ['Vorlagebehälter P-001', f0(P.p[0].vorlage), '%'], ['Ersatzteile', P.ws ? f0(P.ws.kosten) : '0', '€'], ['Notüberlauf seit Start', f0(P.vUeb), 'm³']]; },
     charts: [CH.pegel, CH.qpw, CH.ipw],
-    kennzahl: () => { const P = sim.P; return `Seit Missionsstart gefördert ${f0(P.vGef)} m³ mit ${f1(P.eKwh)} kWh (${P.vGef > 1 ? f0(P.eKwh / P.vGef * 1000) : '–'} Wh/m³).${P.vUeb > 0 ? ` Über den Notüberlauf ungereinigt abgeschlagen: ${f0(P.vUeb)} m³.` : ''}`; },
+    kennzahl: () => { const P = sim.P; return `Seit Missionsstart gefördert ${f0(P.vGef)} m³ mit ${f1(P.eKwh)} kWh (${P.vGef > 1 ? f0(P.eKwh / P.vGef * 1000) : '–'} Wh/m³).${P.ws ? ` Ersatzteilkosten: ${f0(P.ws.kosten)} €.` : ''}${P.vUeb > 0 ? ` Über den Notüberlauf ungereinigt abgeschlagen: ${f0(P.vUeb)} m³.` : ''}`; },
     hinweise: () => {
-      const P = sim.P, h = [], u = P.ursache, fix = VOR_ORT_BEHEBBAR.includes(u);
+      const P = sim.P, h = [], u = U0(), fix = VOR_ORT_BEHEBBAR.includes(u);
       h.push(`Gezogene Karte: ${KARTEN[P.karte].titel}. Tatsächliche Ursache: ${KARTEN[P.karte].ursachen[u]}.`);
       if (sim.diagnose && sim.diagnose !== u) h.push(`Gewählt wurde: ${sim.diagnose === 'unklar' ? 'Ursache nicht eindeutig' : KARTEN[P.karte].ursachen[sim.diagnose]}.`);
       if (!sim.diagnose) h.push('Es wurde keine Ursache in einer Meldung angegeben.');
@@ -117,10 +148,21 @@ function pwMission(karte, zufall = false) {
       if (hat(/Abschaltung durch Trockenlaufschutz/)) h.push('Der Trockenlaufschutz hat ausgelöst – die Gleitringdichtung ist gefährdet.');
       if (hat(/Pumpe lief noch/)) h.push('Ein Reparaturschalter wurde unter Last ausgeschaltet.');
       if (hat(/Wahlschalter \w+ → HAND/)) h.push('Eine Pumpe stand zeitweise in HAND – ohne Pegelschutz kann der Sumpf leerlaufen.');
-      if (P.flut > 0.5) h.push('Beim Entleeren waren Schieber offen – Abwasser ist in den Pumpenraum gelaufen (Wassermelder).');
+      if (hat(/Entleerung geöffnet – ACHTUNG/) || P.flut > 0.5) h.push('Entleerung und Schieber waren gleichzeitig offen – Abwasser ist in den Pumpenraum gelaufen (Wassermelder).');
+      if (hat(/P-001 Ausbau versucht, nicht freigegeben/)) h.push(`Der Ausbau wurde versucht, bevor die Pumpe sicher freigeschaltet war (${erstes(/P-001 Ausbau versucht/).text.split(': ')[1]}).`);
       if (P.vUeb > 0) h.push(`Der Notüberlauf sprang an: ${f0(P.vUeb)} m³ ungereinigtes Abwasser.`);
-      if (P.karte === 'K2' && hat(/Vorlagebehälter auf Sollstand nachgefüllt/)) h.push('Nachfüllen der Vorlage behebt die undichte produktseitige Dichtung nicht.');
-      const q = hat(/P-001 Störung .* quittiert/); if (q) h.push('Eine Störung wurde quittiert – vorher sollte die Ursache geklärt sein.');
+      if (P.karte === 'K2' && hat(/Vorlagebehälter auf Sollstand nachgefüllt/) && !P.ws) h.push('Nachfüllen der Vorlage behebt die undichte produktseitige Dichtung nicht.');
+      if (hat(/P-001 Störung .* quittiert/)) h.push('Eine Störung wurde quittiert – vorher sollte die Ursache geklärt sein.');
+      if (P.ws) {
+        const t = P.ws.teile, unn = TEILE.filter((T) => t[T.id].ersetzt && T.id !== SCHADTEIL[P.wsUrsache] && T.id !== 'gdicht');
+        const bef = TEILE.filter((T) => t[T.id].befund || t[T.id].gemessen).length;
+        h.push(`Werkstatt: ${bef} ${bef === 1 ? 'Bauteil' : 'Bauteile'} befundet bzw. gemessen, Ersatzteilkosten ${f0(P.ws.kosten)} €.`);
+        if (unn.length) h.push(`Unnötig ersetzt: ${unn.map((T) => `${T.name} (${T.preis} €)`).join(', ')}.`);
+        if (P.ws.eingebaut && !P.ws.repariert) h.push('Die Ursache wurde in der Werkstatt nicht beseitigt – das Symptom tritt nach dem Einbau wieder auf.');
+        if (P.ws.eingebaut && !t.gdicht.ersetzt) h.push('Die alte Gehäusedichtung wurde wiederverwendet.');
+        if (P.wsUrsache === 'zopf' && t.laufrad.ersetzt) h.push('Beim Faserzopf hätte Reinigen gereicht – das Laufrad war unbeschädigt.');
+        if (hat(/läuft mit leerem Vorlagebehälter/)) h.push('P-001 ist mit leerem Vorlagebehälter angelaufen – die atmosphärenseitige Gleitringdichtung lief trocken und ist beschädigt.');
+      }
       return h;
     },
   };
@@ -219,10 +261,10 @@ export const MISSIONEN = [
     },
   },
   ...Object.keys(KARTEN).map((k) => pwMission(k)),
-  { ...pwMission('K1', true), wuerfel: () => pwMission(Object.keys(KARTEN)[Math.floor(Math.random() * 4)], true) },
+  ...['zufall', 'komplett', 'werkstatt'].map((art) => ({ ...pwMission('K1', art), wuerfel: () => pwMission(Object.keys(KARTEN)[Math.floor(Math.random() * 4)], art) })),
 ];
 
-export function initMissionen({ ui, walk, setExam }) {
+export function initMissionen({ ui, walk, wks, setExam }) {
   let aktiv = null, ctx = null, bericht = null;
   const stars = (n) => '★'.repeat(n) + '☆'.repeat(3 - n);
   $('misList').innerHTML = MISSIONEN.map((m) => `<div class="mis">
@@ -242,14 +284,14 @@ export function initMissionen({ ui, walk, setExam }) {
     let m = MISSIONEN.find((x) => x.id === id);
     if (m.wuerfel) m = m.wuerfel();
     const exam = $('misExam').checked; ui.erklaer = !exam; setExam(exam);
-    startSzenario({ faul: m.faul, bel: m.bel, pw: m.pw || null, speed: m.speed || +$('spSel').value, titel: `Mission „${m.titel}“${exam ? ' (Prüfungsmodus)' : ''}` });
+    startSzenario({ faul: m.faul, bel: m.bel, pw: m.pw || null, pwOpt: m.pwOpt || {}, speed: m.speed || +$('spSel').value, titel: `Mission „${m.titel}“${exam ? ' (Prüfungsmodus)' : ''}` });
     ui.diagnose = !!m.pw;
     aktiv = m; ctx = { t0: performance.now(), tSim0: sim.S.t, exam, werteStart: m.werte ? m.werte() : [] };
     $('mis').style.display = 'none';
-    $('briefT').textContent = m.titel; $('briefM').textContent = `${m.bereich} · ${m.dauer}`; $('briefA').textContent = m.auftrag;
+    $('briefT').textContent = m.titel; $('briefM').textContent = `${m.bereich} · ${m.dauer}`; $('briefA').textContent = m.auftragStart || m.auftrag;
     $('brief').style.display = 'flex'; $('misBar').style.display = 'flex'; document.body.classList.add('mission'); $('misName').textContent = m.titel;
   };
-  $('briefGo').onclick = () => { $('brief').style.display = 'none'; walk.enter(aktiv ? aktiv.start : 'leitwarte'); if (aktiv) ui.showPLS(aktiv.tab); };
+  $('briefGo').onclick = () => { $('brief').style.display = 'none'; walk.enter(aktiv ? aktiv.start : 'leitwarte'); if (aktiv) { ui.showPLS(aktiv.tab); if (aktiv.werkstattStart && !ctx.wsGeoeffnet) { ctx.wsGeoeffnet = true; wks.open(); } } };
   $('bAuftrag').onclick = () => { $('brief').style.display = 'flex'; };
 
   $('bEnde').onclick = () => {

@@ -20,7 +20,7 @@ export function sammleBericht(m, ctx) {
   return {
     titel: m.titel, bereich: m.bereich, name: ctx.name || '', datum: new Date().toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'short' }),
     dauer: mmss(performance.now() - ctx.t0), simVon: zeit(tStart), simBis: zeit(tEnd), speed: sim.speed, exam: ctx.exam,
-    auftrag: m.auftrag, checks, kennzahl: m.kennzahl ? m.kennzahl() : '', werte,
+    auftrag: m.auftragStart || m.auftrag, checks, kennzahl: m.kennzahl ? m.kennzahl() : '', werte,
     charts: (m.charts || []).map((c) => ({ ...c, t0: tStart - (m.vorlauf || 2) * 3600, t1: tEnd, tStart, data: hist[c.src] })),
     hinweise: m.hinweise ? m.hinweise(ereignisse) : [], ereignisse, alarme,
     meldungen: ereignisse.filter((e) => e.art === 'meldung').map((e) => e.text.replace(/^MELDUNG an Schichtleitung: /, '')),

@@ -237,11 +237,13 @@ import { buildFaulung } from './js/faulung-szene.js';
 import { initAnlageUI } from './js/anlage-ui.js';
 import { buildBelueftung } from './js/belueftung-szene.js';
 import { buildPumpwerk, PW_ORT, PW_WAENDE } from './js/pumpwerk-szene.js';
+import { initWerkstatt } from './js/werkstatt.js';
 import { initMissionen } from './js/missionen.js';
 import { insts, instMeshes, updateInstruments } from './js/instrumente.js';
 import { createWalk } from './js/begehung.js';
 import { simTick, sim } from './js/anlage-sim.js';
 const fui = initAnlageUI();
+const wks = initWerkstatt(fui);
 
 // ------------------------------------------------------------------ Renderer / Szene
 const canvas = document.getElementById('c');
@@ -631,7 +633,7 @@ scene.add(bubbleMesh);
 
 // Gebläsestation, Luftverteilung, Sondenausleger (begehbar, mit Belüftungssimulation) → js/belueftung-szene.js
 const bel = buildBelueftung(scene, { box, cyl, reg, M, std }, { toast: (m) => fui.toast(m) });
-const pwt = buildPumpwerk(scene, { box, cyl, reg, M, std }, { toast: (m) => fui.toast(m) });
+const pwt = buildPumpwerk(scene, { box, cyl, reg, M, std }, { toast: (m) => fui.toast(m), werkstatt: () => wks.open() });
 // Fällmittelstation
 {
   const g = new THREE.Group();
@@ -1083,7 +1085,7 @@ document.getElementById('bWalk').onclick = e => {
 };
 const _enter = walk.enter;
 walk.enter = (k) => { _enter(k); const b = document.getElementById('bWalk'); b.classList.add('on'); b.textContent = '⬆ Luftbild'; };
-initMissionen({ ui: fui, walk, setExam: (on) => document.body.classList.toggle('exam', on) });
+initMissionen({ ui: fui, walk, wks, setExam: (on) => document.body.classList.toggle('exam', on) });
 const _exit = walk.exit;
 walk.exit = () => { _exit(); const b = document.getElementById('bWalk'); b.classList.remove('on'); b.textContent = '🚶 Begehen'; layout(); };
 
@@ -1123,7 +1125,7 @@ function tick() {
     }
     controls.update();
   }
-  renderer.render(scene, camera);
+  if (!wks.offen) renderer.render(scene, camera);           // Werkstatt hat eigenen Renderer
   for (const c of spinRS) c.rotation.x += 14 * dt;
   if (showLbl && interiorOn) for (const tg of RSI.tags) {
     pv.copy(tg.v).project(camera);
@@ -1138,7 +1140,7 @@ function tick() {
   }
   requestAnimationFrame(tick);
 }
-window.__ka3d = { THREE, scene, renderer, camera, controls, walk, faul, sim, ui: fui };
+window.__ka3d = { THREE, scene, renderer, camera, controls, walk, faul, sim, ui: fui, wks };
 document.getElementById('load').remove();
 tick();
 </script>
