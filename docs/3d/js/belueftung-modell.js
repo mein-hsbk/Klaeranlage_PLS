@@ -65,6 +65,7 @@ export function stepBel(b, dt, log) {
     const sig = (s.out ? c : s.o2) * s.f * s.cal;
     s.meas = approach(s.meas, sig, s.f < 0.8 ? 300 : 60, dt);
     o2m += s.o2 / 2;
+    if (s.out && s.ctrl.auto) s.minOutAuto = Math.min(s.minOutAuto ?? 99, s.o2);
     Lref += our / (CA * (c - Math.min(s.ctrl.sp, c - 0.5)));
   });
   b.nh4 = approach(b.nh4, nh4Stat(o2m) * ld * ld, 2 * 3600, dt);
@@ -85,8 +86,8 @@ export function stepBel(b, dt, log) {
   al('nh4', b.nh4 > 5, 'QI 302 NH₄-N Ablauf Belebung hoch', 'A');
 
   if (b.t >= b.histNext) {
-    b.hist.push({ t: b.t, m1: b.s[0].meas, m2: b.s[1].meas, l1: b.s[0].L, l2: b.s[1].L, p: b.pkw, nh4: b.nh4 });
-    if (b.hist.length > 600) b.hist.shift();
+    b.hist.push({ t: b.t, m1: b.s[0].meas, m2: b.s[1].meas, o1: b.s[0].o2, o2: b.s[1].o2, l1: b.s[0].L, l2: b.s[1].L, p: b.pkw, pr: b.pref, nh4: b.nh4 });
+    if (b.hist.length > 1000) b.hist.shift();
     b.histNext = b.t + 300;
   }
 }
@@ -107,7 +108,7 @@ export function setupBel(sz) {
 
 // Bedienhandlungen vor Ort
 export function sondeZiehen(b, i, log) {
-  const s = b.s[i]; s.out = !s.out;
+  const s = b.s[i]; s.out = !s.out; s.hand = null;
   log(`${STR[i].qi} ${s.out ? 'aus dem Becken gezogen' : 'wieder eingesetzt'} – Regler ${STR[i].qic} steht auf ${s.ctrl.auto ? 'AUTO' : 'HAND'}`);
 }
 export function sondeReinigen(b, i, log) {

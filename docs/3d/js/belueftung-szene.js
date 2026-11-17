@@ -141,6 +141,7 @@ export function buildBelueftung(scene, h, hooks = {}) {
             const cx = W * 0.5, cy = Hc * 0.78;
             ctx.fillStyle = '#2c3e50'; ctx.fillRect(cx - W * 0.25, cy - Hc * 0.1, W * 0.4, Hc * 0.2);
             ctx.fillStyle = '#bdc3c7'; ctx.beginPath(); ctx.ellipse(cx + W * 0.17, cy, W * 0.05, Hc * 0.1, 0, 0, 7); ctx.fill();
+            ctx.font = `${W * 0.042}px Arial`; ctx.textBaseline = 'top'; ctx.textAlign = 'left';
             if (s.f < 0.8) { ctx.fillStyle = 'rgba(96,78,30,0.85)'; for (let k = 0; k < 14; k++) { ctx.beginPath(); ctx.arc(cx + W * 0.17 + Math.sin(k * 2.1) * W * 0.035, cy + Math.cos(k * 1.7) * Hc * 0.07, W * 0.018, 0, 7); ctx.fill(); }
               ctx.fillStyle = '#dfe6e9'; ctx.fillText('Membran mit braunem, schleimigem Belag', W * 0.05, Hc * 0.93); }
             else { ctx.fillStyle = '#dfe6e9'; ctx.fillText('Membran sauber', W * 0.05, Hc * 0.93); }
