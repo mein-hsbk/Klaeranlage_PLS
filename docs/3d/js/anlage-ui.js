@@ -2,6 +2,7 @@
 // Instrument-Detailansicht, Protokoll, Meldung an die Schichtleitung, Hinweise (Toast).
 import { P, fmtZeit } from './faulung-modell.js';
 import { PB, STR, MODI } from './belueftung-modell.js';
+import { PP, KARTEN } from './pumpwerk-modell.js';
 import { sim, logA, logText } from './anlage-sim.js';
 import { insts, f1, f0 } from './instrumente.js';
 
@@ -61,14 +62,15 @@ export function initAnlageUI() {
 
   // ---------------- Leitwarte mit Reitern
   let plsOpen = false, tab = 'faul';
-  const togglePLS = (quiet) => { plsOpen = !plsOpen; $('pls').style.display = plsOpen ? 'block' : 'none'; $('bPLS').classList.toggle('on', plsOpen); if (plsOpen) { if (quiet !== true) logA(`Leitwarte geöffnet (${tab === 'faul' ? 'Faulung/Gas' : 'Belüftung'})`, 'blick'); renderPLS(); } };
+  const TABN = { faul: 'Faulung/Gas', bel: 'Belüftung', pw: 'PW Talstraße' };
+  const togglePLS = (quiet) => { plsOpen = !plsOpen; $('pls').style.display = plsOpen ? 'block' : 'none'; $('bPLS').classList.toggle('on', plsOpen); if (plsOpen) { if (quiet !== true) logA(`Leitwarte geöffnet (${TABN[tab]})`, 'blick'); renderPLS(); } };
   ui.showPLS = (t) => { if (t) setTab(t, true); if (!plsOpen) togglePLS(true); };
   $('bPLS').onclick = () => togglePLS(); $('plsClose').onclick = () => togglePLS();
   addEventListener('keydown', (e) => { if (e.code === 'Tab' && document.body.classList.contains('walking')) { e.preventDefault(); togglePLS(); } });
   function setTab(t, silent) {
     tab = t; for (const b of document.querySelectorAll('#plsTabs .btn')) b.classList.toggle('on', b.dataset.t === t);
-    $('plsFaul').style.display = t === 'faul' ? '' : 'none'; $('plsBel').style.display = t === 'bel' ? '' : 'none';
-    if (!silent) logA(`Leitwarte: Bild ${t === 'faul' ? 'Faulung/Gas' : 'Belüftung'}`, 'blick');
+    $('plsFaul').style.display = t === 'faul' ? '' : 'none'; $('plsBel').style.display = t === 'bel' ? '' : 'none'; $('plsPW').style.display = t === 'pw' ? '' : 'none';
+    if (!silent) logA(`Leitwarte: Bild ${TABN[t]}`, 'blick');
     renderPLS();
   }
   $('plsTabs').onclick = (e) => { if (e.target.dataset.t) setTab(e.target.dataset.t); };
@@ -96,6 +98,24 @@ export function initAnlageUI() {
       <div class="cnt">Zähler seit Start: BHKW ${f0(S.eBhkw)} kWh · Fackel ${f0(S.vFackel)} Nm³ · Netzbezug ${f0(S.eBezug)} kWh${S.vAbblasen > 0 ? ` · <span class="a">abgeblasen ${f0(S.vAbblasen)} Nm³</span>` : ''}</div>`;
       $('plsAl').innerHTML = alarmList(Object.values(S.alarme));
       drawTrend($('trend'), S.hist, S.t, 12, [['lvl', '#ffd32a', (v) => v], ['pel', '#00d2d3', (v) => v / 1.25], ['q', '#ff9f43', (v) => v * 1.25], ['ch4', '#a29bfe', (v) => v], ['T', '#ff6b6b', (v) => (v - 20) * 4]], (p) => p.f);
+    } else if (tab === 'pw') {
+      const W = sim.P, st = (x) => x.stoer ? 'Störung' : !x.rep ? 'Rep.-Sch. 0' : x.run ? 'Betrieb' : 'Bereit';
+      const cl = (x) => (x.stoer || !x.rep ? 'a' : '');
+      $('pwVals').innerHTML = `<table>
+        ${row('LI-001', 'Pegel Pumpensumpf', num(W.li, 2), 'm', W.li > 2.4 ? 'a' : '')}
+        ${row('FI-001', 'Förderstrom Druckleitung', f0(W.q), 'm³/h', W.p.some((x) => x.run && x.laeuftT > 120 && x.q < PP.Q_SOLL) ? 'w' : '')}
+        ${row('', 'Ein- / Ausschaltpegel', `${num(W.liEin, 2)} / ${num(W.liAus, 2)}`, 'm')}
+      </table><table style="margin-top:4px">
+        <tr><td></td><td></td><td class="v hd">P-001</td><td class="v hd">P-002</td><td></td></tr>
+        <tr><td class="tg">YS</td><td>Zustand</td><td class="v ${cl(W.p[0])}">${st(W.p[0])}</td><td class="v ${cl(W.p[1])}">${st(W.p[1])}</td><td></td></tr>
+        <tr><td class="tg">HS</td><td>Wahlschalter</td><td class="v ${W.p[0].wahl !== 'auto' ? 'w' : ''}">${({ hand: 'HAND', '0': '0', auto: 'AUTO' })[W.p[0].wahl]}</td><td class="v ${W.p[1].wahl !== 'auto' ? 'w' : ''}">${({ hand: 'HAND', '0': '0', auto: 'AUTO' })[W.p[1].wahl]}</td><td></td></tr>
+        <tr><td class="tg">II</td><td>Motorstrom</td><td class="v">${num(W.p[0].amp)}</td><td class="v">${num(W.p[1].amp)}</td><td class="u">A</td></tr>
+        <tr><td class="tg"></td><td>Betriebsstunden</td><td class="v">${f0(W.p[0].bh)}</td><td class="v">${f0(W.p[1].bh)}</td><td class="u">h</td></tr>
+        <tr><td class="tg"></td><td>Schaltspiele seit Start</td><td class="v">${W.p[0].starts}</td><td class="v">${W.p[1].starts}</td><td></td></tr>
+      </table>
+      <div class="cnt">Seit Start: gefördert ${f0(W.vGef)} m³ · Energie ${f0(W.eKwh)} kWh${W.vUeb > 0 ? ` · <span class="a">Notüberlauf ${f0(W.vUeb)} m³</span>` : ''}</div>`;
+      $('pwAl').innerHTML = alarmList(Object.values(W.alarme));
+      drawTrend($('trendP'), W.hist, W.t, 3, [['li', '#ffd32a', (v) => v / 3 * 100], ['q1', '#00d2d3', (v) => v / 1.5], ['q2', '#74b9ff', (v) => v / 1.5], ['i1', '#ff6b6b', (v) => v / 30 * 100]]);
     } else {
       const B = sim.B;
       $('belVals').innerHTML = `<table>
@@ -167,9 +187,23 @@ export function initAnlageUI() {
   $('bLog').onclick = () => { logOpen = !logOpen; $('log').style.display = logOpen ? 'block' : 'none'; $('bLog').classList.toggle('on', logOpen); renderLog(); };
   $('logClose').onclick = () => { logOpen = false; $('log').style.display = 'none'; $('bLog').classList.remove('on'); };
   $('logCopy').onclick = async () => { try { await navigator.clipboard.writeText(logText()); ui.toast('Protokoll kopiert.'); } catch { ui.toast('Kopieren nicht möglich – Text markieren und kopieren.'); } };
-  $('bMeld').onclick = () => { $('meld').style.display = 'flex'; $('meldText').focus(); };
+  // Diagnoseauswahl (nur in Pumpwerksmissionen): ui.diagnose = true, wenn die Mission eine Diagnose verlangt
+  ui.diagnose = null;
+  $('bMeld').onclick = () => {
+    const k = ui.diagnose && KARTEN[sim.P.karte], sel = $('meldDiag');
+    $('meldDiagW').style.display = k ? '' : 'none';
+    if (k) sel.innerHTML = '<option value="">– Ursache auswählen –</option>' + Object.entries(k.ursachen).map(([v, t]) => `<option value="${v}">${t}</option>`).join('') + '<option value="unklar">Ursache nicht eindeutig feststellbar</option>';
+    $('meld').style.display = 'flex'; $('meldText').focus();
+  };
   $('meldCancel').onclick = () => { $('meld').style.display = 'none'; };
-  $('meldOk').onclick = () => { const t = $('meldText').value.trim(); if (t) { logA(`MELDUNG an Schichtleitung: ${t}`, 'meldung'); ui.toast('Meldung protokolliert.'); } $('meldText').value = ''; $('meld').style.display = 'none'; };
+  $('meldOk').onclick = () => {
+    const t = $('meldText').value.trim(), k = ui.diagnose && KARTEN[sim.P.karte], d = k ? $('meldDiag').value : '';
+    if (k && !d) return ui.toast('Bitte die festgestellte Ursache auswählen.');
+    if (d) { sim.diagnose = d; logA(`DIAGNOSE: ${d === 'unklar' ? 'Ursache nicht eindeutig feststellbar' : k.ursachen[d]}`, 'meldung'); }
+    if (t) logA(`MELDUNG an Schichtleitung: ${t}`, 'meldung');
+    if (t || d) ui.toast('Meldung protokolliert.');
+    $('meldText').value = ''; $('meld').style.display = 'none';
+  };
 
   // ---------------- zyklische Aktualisierung
   let t = 0;
@@ -177,7 +211,7 @@ export function initAnlageUI() {
     t -= dt; if (t > 0) return; t = 0.5;
     const S = sim.S;
     $('simClock').textContent = `Tag ${Math.floor(S.t / 86400) + 1} · ${fmtZeit(S.t)} · ×${sim.speed}`;
-    const nA = [...Object.values(S.alarme), ...Object.values(sim.B.alarme)].filter((a) => a.aktiv && a.klasse === 'A').length;
+    const nA = [...Object.values(S.alarme), ...Object.values(sim.B.alarme), ...Object.values(sim.P.alarme)].filter((a) => a.aktiv && a.klasse === 'A').length;
     $('bPLS').textContent = nA ? `Leitwarte (${nA} ⚠)` : 'Leitwarte';
     $('bPLS').classList.toggle('alarm', nA > 0);
     if (plsOpen) renderPLS();

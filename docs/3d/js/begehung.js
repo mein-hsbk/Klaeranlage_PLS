@@ -17,9 +17,10 @@ export const STATIONEN = {
   belebung2: { n: 'Belebung Str. 2', p: [46, -15.6, 46, -17.1] },
   nk: { n: 'Nachklärung', p: [102, 4, 102, -18] },
   rs: { n: 'RS-Pumpwerk', p: [82, -36, 72, -40] },
+  talstr: { n: 'PW Talstraße', p: [-187.6, 67.4, -190.6, 68.3] },
 };
 
-export function createWalk({ scene, camera, canvas, controls, fence, getInstMeshes, insts, onInspect, onPickComp, isBlocked }) {
+export function createWalk({ scene, camera, canvas, controls, fence, areas = [], walls = [], getInstMeshes, insts, onInspect, onPickComp, isBlocked }) {
   const $ = (id) => document.getElementById(id);
   const P = { x: 0, z: 0, yaw: 0, pitch: 0 };
   const keys = {};
@@ -42,8 +43,14 @@ export function createWalk({ scene, camera, canvas, controls, fence, getInstMesh
   }
   function collide() {
     const r = 0.35;
-    P.x = Math.max(fence.x0 + 1, Math.min(fence.x1 - 1, P.x)); P.z = Math.max(fence.z0 + 1, Math.min(fence.z1 - 1, P.z));
-    for (const [x0, z0, x1, z1] of colliders) {
+    // begehbare Bereiche: Betriebsgelände und zusätzliche Flächen (z. B. Zufahrt zum Außenpumpwerk)
+    let best = null, bd = Infinity;
+    for (const a of [fence, ...areas]) {
+      const cx = Math.max(a.x0 + 1, Math.min(a.x1 - 1, P.x)), cz = Math.max(a.z0 + 1, Math.min(a.z1 - 1, P.z)), d = Math.hypot(cx - P.x, cz - P.z);
+      if (d < bd) { bd = d; best = [cx, cz]; }
+    }
+    P.x = best[0]; P.z = best[1];
+    for (const [x0, z0, x1, z1] of [...colliders, ...walls]) {
       if (P.x < x0 - r || P.x > x1 + r || P.z < z0 - r || P.z > z1 + r) continue;
       const nx = Math.max(x0, Math.min(x1, P.x)), nz = Math.max(z0, Math.min(z1, P.z));
       const dx = P.x - nx, dz = P.z - nz, d = Math.hypot(dx, dz);

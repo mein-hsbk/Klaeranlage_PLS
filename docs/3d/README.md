@@ -23,7 +23,18 @@ Handmessung) sowie Prüfungen an Gebläsen. Auch Fehlbedienungen wirken sich im 
 Klappe auf ORT, Sonde im AUTO-Betrieb gezogen, Kalibrierung mit falschem Luftdruck) und erscheinen im Missionsbericht.
 O₂-Sättigung: c_s(T) nach Elmore/Hayes (DIN EN ISO 5814) bei 1013 hPa, skaliert mit dem Luftdruck (PI 001 in der Leitwarte).
 
-Über „🎯 Missionen“ startet eine vorbereitete Betriebssituation: Auftrag (Briefing) → Start an der Leitwarte →
+**Abwasserpumpwerk Talstraße** (Außenpumpwerk an der Zufahrtsstraße, Station „PW Talstraße“, Leitwarten-Reiter
+„PW Talstraße“): zwei trocken aufgestellte KSB Sewatec E 100-317 (ø 286 mm, 1450 1/min, 15 kW) mit Kennlinie und
+Wirkungsgrad aus dem PLS, Anlagenkennlinie der Druckleitung, NPSH-Prüfung (Kavitation), Niveausteuerung (Ein 1,60 m /
+Aus 0,80 m, Reserve ab 2,30 m, Notüberlauf ab 2,80 m), Tandem-Gleitringdichtung mit Vorlagebehälter, fettgeschmierte
+Wälzlager. Vor Ort: Saug-/Druckmanometer, Saug- und Druckschieber, Entleerung, Vorlagebehälter (nachziehen,
+nachfüllen), Vor-Ort-Schaltkasten (Wahlschalter HAND/0/AUTO, Reparaturschalter mit Schloss, Einschaltversuch,
+Quittieren), Pumpensteuerung mit Störungsspeicher und Pegeleinstellung, Blick in den Pumpensumpf sowie Messungen
+an der Pumpe (Abhören, Lagertemperatur, Schwingschnelle nach DIN ISO 10816-3, Sichtprüfung). Fehlbedienungen wirken
+sich aus: Trockenlauf (TSA löst aus, Dichtung gefährdet), Lauf gegen geschlossenen Druckschieber, Entleeren bei offenen
+Schiebern (Wassermelder), Reparaturschalter unter Last, Notüberlauf.
+
+Über „🎯 Missionen“ startet eine vorbereitete Betriebssituation: Auftrag (Briefing) → Start an der Leitwarte bzw. vor Ort →
 Kontrollgang → „Beenden“ öffnet den **Missionsbericht**: erfüllte Prüfschritte mit Begründung, Energiekennzahl,
 Beobachtungen zum Vorgehen (z. B. „Sonde im AUTO-Betrieb gezogen“), Prozesswerte Start/Ende, Leitwarten-Diagramme
 mit nummerierten Handlungen (inkl. „tatsächlicher“ Werte, die die Leitwarte nicht zeigt), Zeitstrahl und Meldungen.
@@ -36,9 +47,10 @@ Browser mit jsPDF (`vendor/jspdf.umd.min.js`, wird erst beim ersten Speichern ge
 | BHKW steht | HA 611 nach Wartung geschlossen → BHKW-Störung „Gasdruck min“, Speicher läuft voll, Fackel zündet |
 | Faulturm kühlt aus | Motorschutz Heizwasserpumpe P11.1 ausgelöst → Faulturm kühlt aus, CH4 sinkt, BHKW schaltet ab |
 | Stromfresser Gebläsestation | Belag auf O₂-Sonde QI 301 → Sonde zeigt zu wenig, Regler bläst zu viel Luft ein; fachgerecht: HAND, Sonde ziehen, reinigen, kalibrieren, AUTO |
+| Pumpwerk: 4 Störungskarten + Zufallskarte | LS „Störung beim Betrieb einer Kreiselradpumpe“, angepasst an die Sewatec. Ursache je Start zufällig: **K1** Fördermenge zu gering (Faserzopf, Spaltverschleiß, Druck- oder Saugschieber gedrosselt), **K2** Vorlage der GLRD steigt/trüb (Gleitflächen, O-Ring, Trockenlauf laut Störungsspeicher), **K3** laute Geräusche (Lufteinzug durch verstellten Ausschaltpegel, Lagerschaden, Fremdkörper/Unwucht, Kupplung), **K4** Leckage nach außen (atmosphärenseitige GLRD, Verschraubung Vorlage, Gehäusedichtung). Vor Ort behebbar: Schieber, Ausschaltpegel, Verschraubung; sonst Reserve P-002 in Betrieb und P-001 fachgerecht außer Betrieb nehmen. Falle (≈ 35 %): Druckschieber der Reservepumpe nach Wartung geschlossen. Diagnose wird in der Meldung ausgewählt. Zeitraffer ×5 |
 
 Die vollständigen Lösungshinweise stehen im Missionsmenü (aufklappbar) und in `js/missionen.js`.
-Neue Missionen: Eintrag in `MISSIONEN` mit Szenario-Codes (`faul`, `bel`), Startstation, Auftrag und Prüfschritten.
+Neue Missionen: Eintrag in `MISSIONEN` mit Szenario-Codes (`faul`, `bel`, `pw`), Startstation, Auftrag und Prüfschritten.
 Im Prüfungsmodus sind Beschriftungen, Schnellwahl und Erklärtexte ausgeblendet.
 
 ## Dateien
@@ -48,6 +60,8 @@ Im Prüfungsmodus sind Beschriftungen, Schnellwahl und Erklärtexte ausgeblendet
 | `index.html` | Gesamte Anlage (Geometrie, Rundgang, Infotexte, Fließwege, RS-Innenansicht), Oberfläche, Hauptschleife |
 | `js/faulung-modell.js` | Prozessmodell Faulung/Gas, Szenarien S0–S2 (reine Rechenlogik) |
 | `js/belueftung-modell.js` | Prozessmodell Belüftung: 2 Straßen, PI-Regler, Drehkolbengebläse, Sondenzustand, Szenarien B0/B1 |
+| `js/pumpwerk-modell.js` | Prozessmodell Pumpwerk Talstraße: Kennlinien, Betriebspunkt, NPSH, Niveausteuerung, Störungskarten und -ursachen, Bedienhandlungen |
+| `js/pumpwerk-szene.js` | 3D des Pumpwerks mit Pumpenaggregaten, Armaturen, Instrumenten, Schaltkästen, Steuerung |
 | `js/anlage-sim.js` | gemeinsamer Zustand, Zeitraffer, Kopplung der Modelle, Protokoll |
 | `js/instrumente.js` | Zeichenfunktionen und Registry der Vor-Ort-Instrumente |
 | `js/faulung-szene.js` | 3D der Faulung inkl. Instrumente und Animationen |

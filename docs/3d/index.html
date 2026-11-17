@@ -104,7 +104,7 @@
   .fpi{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 10px}
   .fpi label{font-size:11px;color:#b2bec3;display:flex;align-items:center;gap:4px;white-space:nowrap}
   .fpi input{width:64px;font-size:14px;padding:3px 5px;border-radius:4px;border:1px solid #2d4a7a;background:#0f3460;color:#fff;font-family:monospace}
-  #trendB{width:100%;height:150px;display:block;border-radius:6px;margin-top:6px}
+  #trendB,#trendP{width:100%;height:150px;display:block;border-radius:6px;margin-top:6px}
   .card.wide{max-width:860px}
   #misList{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px;margin-top:8px}
   .mis{background:#0f3460;border:1px solid #2d4a7a;border-radius:10px;padding:10px 12px;display:flex;flex-direction:column}
@@ -155,13 +155,19 @@
 <div id="hint"></div>
 <div id="joy"><div id="knob"></div></div>
 <div id="pls">
-  <h3>Leitwarte <span id="plsTabs"><button class="btn on" data-t="faul">Faulung / Gas</button><button class="btn" data-t="bel">Belüftung</button></span><button class="btn" id="plsClose" aria-label="Schließen">×</button></h3>
+  <h3>Leitwarte <span id="plsTabs"><button class="btn on" data-t="faul">Faulung / Gas</button><button class="btn" data-t="bel">Belüftung</button><button class="btn" data-t="pw">PW Talstraße</button></span><button class="btn" id="plsClose" aria-label="Schließen">×</button></h3>
   <div id="plsBel" style="display:none">
     <div id="belVals"></div>
     <div id="belFP"></div>
     <canvas id="trendB"></canvas>
     <div class="leg">Trend 24 h, Skala 0–100 %:<i style="background:#ffd32a"></i>QI 301 (0–5 mg/L)<i style="background:#fdcb6e"></i>QI 311<i style="background:#00d2d3"></i>Luft Str. 1 (0–3.000 Nm³/h)<i style="background:#74b9ff"></i>Luft Str. 2<i style="background:#ff6b6b"></i>P Gebläse (0–200 kW)<i style="background:#a29bfe"></i>NH₄-N (0–5 mg/L)</div>
     <div id="belAl"></div>
+  </div>
+  <div id="plsPW" style="display:none">
+    <div id="pwVals"></div>
+    <canvas id="trendP"></canvas>
+    <div class="leg">Trend 3 h, Skala 0–100 %:<i style="background:#ffd32a"></i>LI-001 (0–3 m)<i style="background:#00d2d3"></i>Q P-001 (0–150 m³/h)<i style="background:#74b9ff"></i>Q P-002<i style="background:#ff6b6b"></i>Strom P-001 (0–30 A)</div>
+    <div id="pwAl"></div>
   </div>
   <div id="plsFaul">
   <div id="plsVals"></div>
@@ -178,11 +184,12 @@
 <div class="ov" id="meld"><div class="card">
   <h2>Meldung an die Schichtleitung</h2>
   <div class="sub">Befund, vermutete Ursache, durchgeführte oder vorgeschlagene Maßnahme</div>
+  <div id="meldDiagW" style="display:none;margin-bottom:8px"><label class="sub" for="meldDiag">Festgestellte Ursache</label><select id="meldDiag" style="width:100%;font-size:15px;padding:6px;border-radius:6px;background:#0f3460;color:#fff;border:1px solid #2d4a7a;margin-top:4px"></select></div>
   <textarea id="meldText"></textarea>
   <div style="display:flex;gap:8px;margin-top:10px;justify-content:flex-end"><button class="btn" id="meldCancel">Abbrechen</button><button class="btn on" id="meldOk">Protokollieren</button></div>
 </div></div>
 <div class="ov" id="mis"><div class="card wide">
-  <div style="display:flex;align-items:flex-start;gap:8px"><div style="flex:1"><h2>🎯 Missionen</h2><div class="sub">Vorbereitete Betriebssituationen. Start in der Leitwarte, danach Kontrollgang über die Anlage. Ein Start setzt Simulation und Protokoll zurück.</div></div><button class="btn" id="misClose" aria-label="Schließen">×</button></div>
+  <div style="display:flex;align-items:flex-start;gap:8px"><div style="flex:1"><h2>🎯 Missionen</h2><div class="sub">Vorbereitete Betriebssituationen. Start in der Leitwarte bzw. vor Ort, danach Kontrollgang über die Anlage. Ein Start setzt Simulation und Protokoll zurück.</div></div><button class="btn" id="misClose" aria-label="Schließen">×</button></div>
   <div id="misList"></div>
   <div class="misOpt"><label for="spSel">Zeitraffer</label>
   <select id="spSel"><option value="1">×1 (Echtzeit)</option><option value="10">×10</option><option value="60">×60 (1 s = 1 min)</option><option value="120">×120</option></select>
@@ -229,6 +236,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { buildFaulung } from './js/faulung-szene.js';
 import { initAnlageUI } from './js/anlage-ui.js';
 import { buildBelueftung } from './js/belueftung-szene.js';
+import { buildPumpwerk, PW_ORT, PW_WAENDE } from './js/pumpwerk-szene.js';
 import { initMissionen } from './js/missionen.js';
 import { insts, instMeshes, updateInstruments } from './js/instrumente.js';
 import { createWalk } from './js/begehung.js';
@@ -435,13 +443,13 @@ const sstep = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a)
   for (let i = 0; i < p.count; i++) {
     const x = p.getX(i), z = p.getZ(i);
     const out = Math.max(FENCE.x0 - x, x - FENCE.x1, FENCE.z0 - z, z - FENCE.z1, 0);
-    let y = 0.5 * (Math.sin(x * 0.031) + Math.sin(z * 0.026 + 1.2)) * sstep(0, 40, out);
+    let y = 0.5 * (Math.sin(x * 0.031) + Math.sin(z * 0.026 + 1.2)) * sstep(0, 40, out) * sstep(14, 26, Math.hypot(x + 192, z - 70)) * (x < FENCE.x0 ? sstep(4, 12, Math.abs(z - 60)) : 1);   // eben: Pumpwerk, Zufahrtsstraße
     const d = creekDist(x, z), s = sstep(1.5, 6.5, d);
     y = y * s + (-1.8) * (1 - s);
     p.setY(i, y);
     const n = 0.5 + 0.5 * Math.sin(x * 0.13 + Math.sin(z * 0.07) * 2) * Math.sin(z * 0.11);
     if (out === 0) c.setRGB(0.42 + n * 0.04, 0.58 + n * 0.04, 0.30);
-    else if (x < -170 && Math.abs(z - 60) > 6) c.setHSL(((Math.floor((z + 300) / 45)) % 2) ? 0.17 : 0.24, 0.42, 0.40 + n * 0.06); // Feldflur
+    else if (x < -170 && Math.abs(z - 60) > 6 && Math.hypot(x + 192, z - 70) > 15) c.setHSL(((Math.floor((z + 300) / 45)) % 2) ? 0.17 : 0.24, 0.42, 0.40 + n * 0.06); // Feldflur
     else c.setRGB(0.36 + n * 0.05, 0.52 + n * 0.05, 0.27);
     if (d < 7) c.lerp(new THREE.Color(0.30, 0.42, 0.24), 1 - sstep(3, 7, d));
     if (d < 3.6) c.setRGB(0.32, 0.30, 0.24);
@@ -623,6 +631,7 @@ scene.add(bubbleMesh);
 
 // Gebläsestation, Luftverteilung, Sondenausleger (begehbar, mit Belüftungssimulation) → js/belueftung-szene.js
 const bel = buildBelueftung(scene, { box, cyl, reg, M, std }, { toast: (m) => fui.toast(m) });
+const pwt = buildPumpwerk(scene, { box, cyl, reg, M, std }, { toast: (m) => fui.toast(m) });
 // Fällmittelstation
 {
   const g = new THREE.Group();
@@ -849,6 +858,7 @@ const faul = buildFaulung(scene, { box, cyl, railing, circlePts, reg, M, std }, 
   const ok = (x, z) => {
     if (x > FENCE.x0 - 4 && x < FENCE.x1 + 4 && z > FENCE.z0 - 4 && z < FENCE.z1 + 4) return false;
     if (Math.abs(z - 60) < 7 && x < FENCE.x0) return false;
+    if (Math.hypot(x + 192, z - 70) < 17) return false;               // Pumpwerk Talstraße
     return creekDist(x, z) > 7.5;
   };
   for (let n = 0; n < 2500 && T.length < 260; n++) {
@@ -1063,7 +1073,7 @@ canvas.addEventListener('pointerup', e => {
 });
 
 // ------------------------------------------------------------------ Begehung (Ich-Perspektive) → js/begehung.js
-const walk = createWalk({ scene, camera, canvas, controls, fence: FENCE, getInstMeshes: () => instMeshes, insts,
+const walk = createWalk({ scene, camera, canvas, controls, fence: FENCE, areas: [PW_ORT], walls: PW_WAENDE, getInstMeshes: () => instMeshes, insts,
   onInspect: (id, msg) => fui.openDetail(id, msg),
   onPickComp: (r) => { const h = r.intersectObjects(pickables, false)[0]; if (!h || h.distance > 60) return null; select(h.object.userData.comp, false); return h.distance; },
   isBlocked: () => fui.isBlocked() });
@@ -1091,7 +1101,7 @@ const clock = new THREE.Clock(), o3 = new THREE.Object3D(), pv = new THREE.Vecto
 let elapsed = 0;
 function tick() {
   const raw = clock.getDelta(), dt = Math.min(raw, 0.1); elapsed += dt;
-  simTick(raw); faul.update(dt); bel.update(dt); updateInstruments(dt, camera, fui.detail); fui.update(dt);
+  simTick(raw); faul.update(dt); bel.update(dt); pwt.update(dt); updateInstruments(dt, camera, fui.detail); fui.update(dt);
   for (const a of anims) {
     if (a.type === 'rot') a.obj.rotation.y -= a.omega * dt * speed;
     else { a.s = (a.s ?? 0) + a.v * dt * speed; const L = a.b - a.a, ph = a.s % (2 * L); a.obj.position.x = a.a + (ph < L ? ph : 2 * L - ph); }
@@ -1128,7 +1138,7 @@ function tick() {
   }
   requestAnimationFrame(tick);
 }
-window.__ka3d = { THREE, scene, renderer, camera, controls, walk, faul, sim };
+window.__ka3d = { THREE, scene, renderer, camera, controls, walk, faul, sim, ui: fui };
 document.getElementById('load').remove();
 tick();
 </script>
