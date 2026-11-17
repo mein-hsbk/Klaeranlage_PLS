@@ -18,7 +18,7 @@ const stamp = () => {
   return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 };
 function push(text, art) {
-  sim.log.push({ real: stamp(), sim: `T${tag(sim.S.t)} ${fmtZeit(sim.S.t)}`, art, text });
+  sim.log.push({ real: stamp(), sim: `T${tag(sim.S.t)} ${fmtZeit(sim.S.t)}`, art, text, ts: sim.S.t, tr: performance.now() - sim.t0real });
   for (const f of sim.listeners) f();
 }
 export const logA = (text, art = 'aktion') => push(text, art);

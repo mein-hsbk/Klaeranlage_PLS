@@ -141,7 +141,7 @@ export function step(s, dt, log) {
 
   if (s.t >= s.histNext) {
     s.hist.push({ t: s.t, lvl: lvl * 100, q: s.qProd, pel: s.pel, T: s.T_ft, ch4: s.ch4, f: s.fackel ? 1 : 0 });
-    if (s.hist.length > 400) s.hist.shift();
+    if (s.hist.length > 1000) s.hist.shift();
     s.histNext = s.t + 300;
   }
 }

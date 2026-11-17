@@ -17,9 +17,18 @@ Faulung/Gas und Belüftung laufen als eigene, vereinfachte Prozessmodelle im Zei
 geht in den Eigenbedarf der Energiebilanz ein. Vor-Ort-Instrumente zeigen live die Modellwerte, einige sind
 bedienbar. Die Leitwarte (Reiter Faulung/Gas und Belüftung) zeigt bewusst nur Sammelmeldungen; die
 O₂-Regler QIC 301/311 lassen sich dort bedienen (AUTO/HAND, Sollwert, Kp, Tn, Hand-Stellwert).
+Vor Ort lassen sich u. a. bedienen: Betriebsart und Hand-Frequenz beider Gebläse am FU (AUTO/RESERVE/HAND/AUS),
+Regelklappen FV 301/311 (FERN/ORT, Handstellung), O₂-Sonden (ziehen, reinigen, Luftkalibrierung mit Luftdruck-Eingabe,
+Handmessung) sowie Prüfungen an Gebläsen. Auch Fehlbedienungen wirken sich im Modell aus (z. B. Parallelbetrieb,
+Klappe auf ORT, Sonde im AUTO-Betrieb gezogen, Kalibrierung mit falschem Luftdruck) und erscheinen im Missionsbericht.
+O₂-Sättigung: c_s(T) nach Elmore/Hayes (DIN EN ISO 5814) bei 1013 hPa, skaliert mit dem Luftdruck (PI 001 in der Leitwarte).
 
 Über „🎯 Missionen“ startet eine vorbereitete Betriebssituation: Auftrag (Briefing) → Start an der Leitwarte →
-Kontrollgang → „Beenden“ zeigt eine Auswertung (erfüllte Schritte, Energiekennzahl) und das Protokoll.
+Kontrollgang → „Beenden“ öffnet den **Missionsbericht**: erfüllte Prüfschritte mit Begründung, Energiekennzahl,
+Beobachtungen zum Vorgehen (z. B. „Sonde im AUTO-Betrieb gezogen“), Prozesswerte Start/Ende, Leitwarten-Diagramme
+mit nummerierten Handlungen (inkl. „tatsächlicher“ Werte, die die Leitwarte nicht zeigt), Zeitstrahl und Meldungen.
+„⬇ Bericht als PDF“ speichert ihn als A4-PDF (optional mit Name und Musterlösung); erzeugt wird das PDF im
+Browser mit jsPDF (`vendor/jspdf.umd.min.js`, wird erst beim ersten Speichern geladen).
 
 | Mission | Inhalt (für Lehrkräfte) |
 |---------|-------------------------|
@@ -44,9 +53,10 @@ Im Prüfungsmodus sind Beschriftungen, Schnellwahl und Erklärtexte ausgeblendet
 | `js/faulung-szene.js` | 3D der Faulung inkl. Instrumente und Animationen |
 | `js/belueftung-szene.js` | 3D der Gebläsestation, Luftverteilung, Sondenausleger; Blasenbild je Straße |
 | `js/anlage-ui.js` | Leitwarte mit Reglerbedienung, Detailansicht, Protokoll, Meldung |
-| `js/missionen.js` | Missionen: Auftrag, Start, Auswertung |
+| `js/missionen.js` | Missionen: Auftrag, Start, Prüfschritte, Diagramm- und Wertedefinitionen für den Bericht |
+| `js/bericht.js` | Missionsbericht: Datensammlung, Diagramme, Bildschirmansicht, PDF-Export |
 | `js/begehung.js` | Ich-Perspektive: Steuerung, Kollision, Stationen, Instrument-Hinweis |
-| `vendor/` | three.js r160 (MIT) mit OrbitControls |
+| `vendor/` | three.js r160 (MIT) mit OrbitControls, jsPDF 4.2.1 (MIT) |
 
 Neue Instrumente entstehen in den `*-szene.js`-Dateien mit `makeInst(id, { name, tag, pos, rotY, size, draw, info, actions })`.
 Kollision: Alle sichtbaren Meshes zwischen 0,3 m und 1,6 m Höhe wirken als Hindernis (Bounding Box);

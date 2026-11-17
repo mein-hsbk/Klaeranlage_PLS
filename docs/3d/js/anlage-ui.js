@@ -1,7 +1,7 @@
 // Oberfläche der Anlagensimulation: Leitwarte (Faulung/Gas, Belüftung mit Reglerbedienung),
 // Instrument-Detailansicht, Protokoll, Meldung an die Schichtleitung, Hinweise (Toast).
 import { P, fmtZeit } from './faulung-modell.js';
-import { PB, STR } from './belueftung-modell.js';
+import { PB, STR, MODI } from './belueftung-modell.js';
 import { sim, logA, logText } from './anlage-sim.js';
 import { insts, f1, f0 } from './instrumente.js';
 
@@ -29,11 +29,29 @@ export function initAnlageUI() {
     if (!lastInspect[id] || performance.now() - lastInspect[id] > 30000) logA(`angesehen: ${it.tag} (${it.name})`, 'blick');
     lastInspect[id] = performance.now();
   };
+  // Bedienelemente der Detailansicht: Knopf {label, fn}, Auswahl {typ:'wahl', label, optionen:[[wert, text]], wert, fn},
+  // Zahl {typ:'zahl', label, wert, min, max, step, einheit, knopf, fn}, Zwischenüberschrift {typ:'titel', label}
   function renderActions() {
     const it = insts[detail.id], box = $('dAct'); box.innerHTML = '';
+    const nach = () => { renderActions(); (it.detail || it.draw)(detail.ctx, dcv.width, dcv.height); };
     (it.actions ? it.actions() : []).forEach((a) => {
+      if (a.typ === 'titel') { const d = document.createElement('div'); d.className = 'actT'; d.textContent = a.label; box.appendChild(d); return; }
+      if (a.typ === 'wahl') {
+        const d = document.createElement('div'); d.className = 'actRow';
+        d.innerHTML = `<span class="actL">${a.label}</span><span class="seg">${a.optionen.map(([v, t]) => `<button class="btn${v === a.wert ? ' on' : ''}" data-v="${v}">${t}</button>`).join('')}</span>`;
+        d.querySelector('.seg').onclick = (e) => { const v = e.target.dataset.v; if (v != null && v !== String(a.wert)) { a.fn(v); nach(); } };
+        box.appendChild(d); return;
+      }
+      if (a.typ === 'zahl') {
+        const d = document.createElement('div'); d.className = 'actRow';
+        d.innerHTML = `<span class="actL">${a.label}</span><span class="num"><input inputmode="decimal" value="${String(a.wert).replace('.', ',')}"> ${a.einheit || ''} <button class="btn act">${a.knopf || 'Setzen'}</button></span>`;
+        const inp = d.querySelector('input');
+        const go = () => { const v = parseFloat(inp.value.replace(',', '.')); if (!isFinite(v)) return ui.toast('Bitte eine Zahl eingeben.'); a.fn(Math.max(a.min ?? -1e9, Math.min(a.max ?? 1e9, v))); nach(); };
+        d.querySelector('button').onclick = go; inp.onkeydown = (e) => { if (e.key === 'Enter') go(); };
+        box.appendChild(d); return;
+      }
       const b = document.createElement('button'); b.className = 'btn act'; b.textContent = a.label;
-      b.onclick = () => { a.fn(); renderActions(); (it.detail || it.draw)(detail.ctx, dcv.width, dcv.height); }; box.appendChild(b);
+      b.onclick = () => { a.fn(); nach(); }; box.appendChild(b);
     });
   }
   const closeDetail = () => { detail.id = null; $('detail').style.display = 'none'; };
@@ -84,11 +102,14 @@ export function initAnlageUI() {
         <tr><td></td><td></td><td class="v hd">Str. 1</td><td class="v hd">Str. 2</td><td></td></tr>
         <tr><td class="tg">QI 301/311</td><td>O₂ Istwert</td><td class="v ${B.s[0].meas < 1 ? 'a' : ''}">${num(Math.max(0, B.s[0].meas))}</td><td class="v ${B.s[1].meas < 1 ? 'a' : ''}">${num(Math.max(0, B.s[1].meas))}</td><td class="u">mg/L</td></tr>
         <tr><td class="tg">FI 301/311</td><td>Luftmenge</td><td class="v">${f0(B.s[0].L)}</td><td class="v">${f0(B.s[1].L)}</td><td class="u">Nm³/h</td></tr>
-        <tr><td class="tg">FV 301/311</td><td>Klappe</td><td class="v">${f0(B.s[0].klappe)}</td><td class="v">${f0(B.s[1].klappe)}</td><td class="u">%</td></tr>
+        <tr><td class="tg">FV 301/311</td><td>Klappe</td><td class="v ${B.s[0].fv.ort ? 'w' : ''}">${f0(B.s[0].klappe)}${B.s[0].fv.ort ? ' ORT' : ''}</td><td class="v ${B.s[1].fv.ort ? 'w' : ''}">${f0(B.s[1].klappe)}${B.s[1].fv.ort ? ' ORT' : ''}</td><td class="u">%</td></tr>
+        <tr><td class="tg">G1.1/G1.2</td><td>Betriebsart</td><td class="v ${B.g[0].mode !== 'auto' ? 'w' : ''}">${MODI[B.g[0].mode]}</td><td class="v ${B.g[1].mode !== 'reserve' ? 'w' : ''}">${MODI[B.g[1].mode]}</td><td></td></tr>
+        <tr><td class="tg">SC 201/211</td><td>Drehzahl FU</td><td class="v">${num(B.g[0].hz)}</td><td class="v">${num(B.g[1].hz)}</td><td class="u">Hz</td></tr>
       </table><table style="margin-top:4px">
         ${row('FIC 201', 'Luftmenge gesamt', f0(B.Ltot), 'Nm³/h')}
-        ${row('G1.1', 'Drehzahl (FU)', num(B.hz), 'Hz', B.Ltot >= PB.L_MAX * 0.995 ? 'w' : '')}
-        ${row('JI 201', 'Leistung Gebläse', f0(B.pkw), 'kW')}
+        ${row('PI 202', 'Druck Sammelleitung', f0(B.pD), 'mbar', B.pD > 650 ? 'a' : '')}
+        ${row('JI 201', 'Leistung Gebläse gesamt', f0(B.pkw), 'kW')}
+        ${row('PI 001', 'Luftdruck (Wetterstation)', f0(B.pAir), 'hPa')}
         ${row('QI 302', 'NH₄-N Ablauf Belebung', num(B.nh4), 'mg/L', B.nh4 > 5 ? 'a' : '')}
       </table>
       <div class="cnt">Gebläse seit Start: ${f0(B.eGeb)} kWh</div>`;
