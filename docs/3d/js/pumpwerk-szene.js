@@ -2,7 +2,7 @@
 // KSB Sewatec E 100-317 mit Saug-/Druckschieber, Rückschlagklappe, Manometern, Vorlagebehälter der
 // Tandem-Gleitringdichtung, Vor-Ort-Schaltkasten (Wahlschalter, Reparaturschalter) und Pumpensteuerung.
 import * as THREE from 'three';
-import { PP, setWahl, setRep, setSchloss, setSchieber, setAblass, quittieren, setAusPegel, setEinPegel, stopfenNachziehen, vorlageNachfuellen, messung, pumpeName } from './pumpwerk-modell.js';
+import { PP, ausbauen, setWahl, setRep, setSchloss, setSchieber, setAblass, quittieren, setAusPegel, setEinPegel, stopfenNachziehen, vorlageNachfuellen, messung, pumpeName } from './pumpwerk-modell.js';
 import { sim, logA } from './anlage-sim.js';
 import { f1, f0, noise, gauge, lcd, lamp, plate, senses, makeInstFactory, pipeFactory } from './instrumente.js';
 
@@ -21,7 +21,7 @@ export function buildPumpwerk(scene, h, hooks = {}) {
   const ksb = std(0x24508f, { r: 0.45, m: 0.3 }), motorM = std(0x6f7f8c, { r: 0.5, m: 0.4 }), guss = std(0x3a3f44, { r: 0.6, m: 0.5 });
   const rohrM = std(0x5d6d7e, { r: 0.5, m: 0.5 }), rot = std(0xb03a2e, { r: 0.5, m: 0.3 }), gelb = std(0xe1b12c, { r: 0.5 });
   const cylX = (g, r, len, mat, xc, y, z, seg = 28) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, seg), mat); m.rotation.z = Math.PI / 2; m.position.set(xc, y, z); m.castShadow = true; g.add(m); return m; };
-  const anim = { kupplung: [], pfuetze: [] };
+  const anim = { kupplung: [], pfuetze: [], einschub: [] };
   const P = () => sim.P;
 
   const g = new THREE.Group();
@@ -63,7 +63,8 @@ export function buildPumpwerk(scene, h, hooks = {}) {
     { const k = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.11, 0.45, 20), ksb); k.rotation.z = Math.PI / 2; k.position.set(-195.75, AX, zc); g.add(k); }
     // Spiralgehäuse mit Druckstutzen nach oben, Gehäusedeckel
     cylX(g, 0.43, 0.3, ksb, -195.38, AX, zc, 36);
-    cylX(g, 0.37, 0.12, ksb, -195.17, AX, zc, 36);
+    const gE = new THREE.Group(); g.add(gE); anim.einschub.push(gE);   // Einschubeinheit (Rückziehbauweise)
+    cylX(gE, 0.37, 0.12, ksb, -195.17, AX, zc, 36);
     box(g, 0.3, 0.33, 0.6, ksb, -195.38, 0.25, zc);                                           // Gehäusefuß
     cyl(g, 0.075, 0.09, 0.45, ksb, -195.38, AX + 0.25, zr, 20);                               // Druckstutzen
     // Steigleitung: Rückschlagklappe RK, Druckschieber, Sammelleitung
@@ -75,20 +76,20 @@ export function buildPumpwerk(scene, h, hooks = {}) {
     noCol(box(g, 0.05, 0.05, 0.42, M.steel, -195.38, 2.0, zr + s * 0.2, 0, false));
     { const hw = new THREE.Mesh(new THREE.TorusGeometry(0.17, 0.018, 8, 24), rot); hw.position.set(-195.38, 2.0, zr + s * 0.42); hw.userData.noCol = true; g.add(hw); }
     // Dichtungsgehäuse (Tandem-GLRD), Lagerträger, Vorlagebehälter
-    cylX(g, 0.2, 0.25, ksb, -194.98, AX, zc);
-    cylX(g, 0.15, 0.95, ksb, -194.38, AX, zc);
-    box(g, 0.3, 0.5, 0.5, ksb, -194.2, 0.25, zc);
-    noCol(box(g, 0.04, 0.6, 0.04, M.steel, -194.75, AX, zc + s * 0.3, 0, false));            // Halter
-    noCol(cyl(g, 0.08, 0.08, 0.34, std(0xdfe6e9, { r: 0.2, m: 0.1, x: { transparent: true, opacity: 0.55 } }), -194.75, 1.18, zc + s * 0.3, 18));
-    noCol(cyl(g, 0.085, 0.085, 0.04, M.steel, -194.75, 1.52, zc + s * 0.3, 18));
-    pipe(g, [[-194.98, AX + 0.18, zc + s * 0.1], [-194.98, 1.0, zc + s * 0.3], [-194.8, 1.2, zc + s * 0.3]], 0.012, std(0x111111));
-    pipe(g, [[-194.92, AX + 0.18, zc + s * 0.14], [-194.7, 1.45, zc + s * 0.3]], 0.012, std(0x111111));
+    cylX(gE, 0.2, 0.25, ksb, -194.98, AX, zc);
+    cylX(gE, 0.15, 0.95, ksb, -194.38, AX, zc);
+    box(gE, 0.3, 0.5, 0.5, ksb, -194.2, 0.25, zc);
+    noCol(box(gE, 0.04, 0.6, 0.04, M.steel, -194.75, AX, zc + s * 0.3, 0, false));            // Halter
+    noCol(cyl(gE, 0.08, 0.08, 0.34, std(0xdfe6e9, { r: 0.2, m: 0.1, x: { transparent: true, opacity: 0.55 } }), -194.75, 1.18, zc + s * 0.3, 18));
+    noCol(cyl(gE, 0.085, 0.085, 0.04, M.steel, -194.75, 1.52, zc + s * 0.3, 18));
+    pipe(gE, [[-194.98, AX + 0.18, zc + s * 0.1], [-194.98, 1.0, zc + s * 0.3], [-194.8, 1.2, zc + s * 0.3]], 0.012, std(0x111111));
+    pipe(gE, [[-194.92, AX + 0.18, zc + s * 0.14], [-194.7, 1.45, zc + s * 0.3]], 0.012, std(0x111111));
     // Kupplung mit Schutz, Motor
-    const ku = new THREE.Group(); ku.position.set(-193.6, AX, zc); g.add(ku);
+    const ku = new THREE.Group(); ku.position.set(-193.6, AX, zc); gE.add(ku);
     { const a = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.34, 20), guss); a.rotation.z = Math.PI / 2; ku.add(a);
       const mk = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.04, 0.05), gelb); mk.position.y = 0.11; ku.add(mk); noCol(ku); anim.kupplung.push(ku); }
-    noCol(box(g, 0.6, 0.42, 0.42, std(0xf1c40f, { r: 0.5, x: { transparent: true, opacity: 0.35, depthWrite: false } }), -193.6, AX - 0.21, zc, 0, false));
-    box(g, 0.6, 0.2, 0.42, std(0xf1c40f, { r: 0.5 }), -193.6, AX - 0.42, zc);
+    noCol(box(gE, 0.6, 0.42, 0.42, std(0xf1c40f, { r: 0.5, x: { transparent: true, opacity: 0.35, depthWrite: false } }), -193.6, AX - 0.21, zc, 0, false));
+    box(gE, 0.6, 0.2, 0.42, std(0xf1c40f, { r: 0.5 }), -193.6, AX - 0.42, zc);
     cylX(g, 0.27, 1.25, motorM, -192.65, AX, zc);
     for (let k = 0; k < 8; k++) noCol(box(g, 1.1, 0.03, 0.6, motorM, -192.65, AX - 0.28 + k * 0.08, zc, 0, false));
     cylX(g, 0.25, 0.22, motorM, -191.9, AX, zc);
@@ -111,6 +112,7 @@ export function buildPumpwerk(scene, h, hooks = {}) {
       draw: plate(nr, '#dfe6e9'),
       detail: (ctx, W, Hc) => {
         const x = P().p[i], u = i === 0 ? P().ursache : null, l = [];
+        if (x.ausgebaut) { senses(ctx, W, Hc, `Pumpe ${nr}`, ['Einschubeinheit ausgebaut (Werkstatt).', 'Nur das Spiralgehäuse ist noch eingebaut,', 'Öffnung mit Blinddeckel abgedeckt.'], false); return; }
         if (x.run) {
           l.push(x.kav ? 'Läuft, prasselndes Geräusch am Saugstutzen.' : x.luft ? 'Läuft, schlürfend und unruhig.' : u === 'lager' ? 'Läuft, mahlendes Geräusch am Lagerträger.' : u === 'fremd' ? 'Läuft, spürbares Klopfen im Takt der Drehzahl.' : u === 'kupplung' ? 'Läuft, Klappern an der Kupplung.' : 'Läuft gleichmäßig.');
           l.push(x.v > 4.5 ? 'Deutliche Vibration an Grundplatte und Rohrleitung.' : 'Kaum Vibration spürbar.');
@@ -120,7 +122,8 @@ export function buildPumpwerk(scene, h, hooks = {}) {
         l.push(`Wahlschalter ${WAHL[x.wahl]}, Reparaturschalter ${x.rep ? 'EIN' : '0'}`);
         senses(ctx, W, Hc, `Pumpe ${nr}`, l, x.run);
       },
-      actions: () => [
+      actions: () => i === 0 && P().p[0].ausgebaut ? [{ label: 'Werkstatt öffnen (Einschubeinheit P-001)', fn: () => hooks.werkstatt && hooks.werkstatt() }] : [
+        ...(i === 0 ? [{ label: 'Einschubeinheit ausbauen → Werkstatt', fn: () => { const m = ausbauen(P(), logA); if (m) toast(m); else hooks.werkstatt && hooks.werkstatt(); } }] : []),
         { label: 'Abhören (Stethoskop)', fn: () => toast(messung(P(), i, 'hoeren', logA)) },
         { label: 'Lagertemperatur messen', fn: () => toast(messung(P(), i, 'temp', logA)) },
         { label: 'Schwingung messen (Lagerträger)', fn: () => toast(messung(P(), i, 'schw', logA)) },
@@ -256,6 +259,7 @@ export function buildPumpwerk(scene, h, hooks = {}) {
   function update(dt) {
     const pw = P();
     anim.kupplung.forEach((k, i) => { if (pw.p[i].run) k.rotation.x += dt * 25; });
+    anim.einschub.forEach((e, i) => { e.visible = !pw.p[i].ausgebaut; });
     anim.pfuetze.forEach((pf, i) => { const v = pw.p[i].puddle + (i === 0 ? Math.min(3, pw.flut / 3) : 0); pf.visible = v > 0.05; const r = Math.min(1.5, 0.25 + Math.sqrt(v) * 0.5); pf.scale.set(r, 1, r * 0.8); });
   }
   return { update };

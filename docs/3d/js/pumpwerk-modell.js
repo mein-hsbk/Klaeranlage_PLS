@@ -43,7 +43,7 @@ export function createPW(karte = null, ursache = null, falle = false) {
   const pumpe = (nr) => ({ nr, wahl: 'auto', rep: true, schloss: false, vs: 100, vd: 100, ablass: false, run: false, q: 0, h: 0, ps: 0, pd: 0,
     pkw: 0, amp: 0, v: 1.8, tl: 45, vorlage: 60, trueb: 0, puddle: 0, leck: 0, bh: nr === 1 ? 21840 : 19960, starts: 0, stoer: '', tsa: 0, luft: false, kav: false, laeuftT: 0 });
   const pw = { t: 8 * 3600, li: 1.2, liAus: PP.LI_AUS, liEin: PP.LI_EIN, qIn: 70, qUeb: 0, vUeb: 0, flut: 0, p: [pumpe(1), pumpe(2)],
-    karte, ursache, falle, alarme: {}, hist: [], histNext: 0, eKwh: 0, vGef: 0, glrdSchaden: false, historie: [] };
+    karte, ursache, ursache0: ursache, falle, alarme: {}, hist: [], histNext: 0, eKwh: 0, vGef: 0, glrdSchaden: false, historie: [] };
   const P1 = pw.p[0];
   if (ursache === 'schieber') P1.vd = 25;
   if (ursache === 'saug') P1.vs = 14;
@@ -56,7 +56,7 @@ export function createPW(karte = null, ursache = null, falle = false) {
   return pw;
 }
 
-const verfuegbar = (x) => x.rep && !x.stoer && x.wahl !== '0';
+const verfuegbar = (x) => x.rep && !x.stoer && x.wahl !== '0' && !x.ausgebaut;
 
 // hydraulischer Betriebspunkt einer Pumpe
 function betriebspunkt(pw, x, i) {
@@ -93,7 +93,7 @@ export function stepPW(pw, dt, log) {
   const [P1, P2] = pw.p;
   // Steuerung: P-001 Führung, P-002 Reserve (ersetzt P-001 oder Spitzenlast)
   const anf = (x, i) => {
-    if (!x.rep || x.stoer || x.wahl === '0') return false;
+    if (!x.rep || x.stoer || x.wahl === '0' || x.ausgebaut) return false;
     if (x.wahl === 'hand') return true;
     const lead = i === 0 || !(P1.wahl === 'auto' && verfuegbar(P1));
     const ein = lead ? pw.li >= pw.liEin : pw.li >= PP.LI_RES;
@@ -102,7 +102,13 @@ export function stepPW(pw, dt, log) {
   let qOut = 0;
   pw.p.forEach((x, i) => {
     const soll = anf(x, i);
-    if (soll && !x.run) { x.starts++; x.laeuftT = 0; }
+    if (soll && !x.run) {
+      x.starts++; x.laeuftT = 0;
+      if (i === 0 && x.vorlage < 20 && !pw.vorlageLeerMeld) {         // nach Dichtungstausch nicht befüllt
+        pw.vorlageLeerMeld = true; if (!pw.ursache) pw.ursache = 'aussen';
+        log && log('P-001 läuft mit leerem Vorlagebehälter an – die atmosphärenseitige Gleitringdichtung läuft trocken', 'sys');
+      }
+    }
     x.run = soll; x.laeuftT += x.run ? dt : 0;
     x.luft = x.run && pw.li < 0.7;                                     // Hohlwirbel bei tiefem Pegel
     if (x.run) {
@@ -121,7 +127,7 @@ export function stepPW(pw, dt, log) {
       if (x.vd <= 2 && x.laeuftT > 300 && !x.heissMeld) { x.heissMeld = true; log && log(`P-00${x.nr} läuft länger gegen geschlossenen Druckschieber – Pumpe erwärmt sich`, 'sys'); }
       x.bh += h;
     } else { x.q = 0; x.h = 0; x.ps = (pw.li + PP.Z_ACHSE) * 0.0981 * (x.vs > 0 ? 1 : 0); x.pd = x.ps; x.pkw = 0; x.amp = 0; x.kav = false; x.luft = false; }
-    if (x.ablass) { x.ps = 0; x.pd = x.vd > 0 ? x.pd : 0; }
+    if (x.ablass || x.ausgebaut) { x.ps = 0; x.pd = 0; }
     qOut += x.q; x.qMax = Math.max(x.qMax || 0, x.q);
     // Schwingung, Lagertemperatur
     const u = i === 0 ? pw.ursache : null;
@@ -168,9 +174,13 @@ export function stepPW(pw, dt, log) {
   }
 }
 
-export function setupPW(karte) {
+export function setupPW(karte, opt = {}) {
   let ursache = null, falle = false;
-  if (karte && KARTEN[karte]) { const k = Object.keys(KARTEN[karte].ursachen); ursache = k[Math.floor(Math.random() * k.length)]; falle = Math.random() < 0.35; }
+  if (karte && KARTEN[karte]) {
+    let k = Object.keys(KARTEN[karte].ursachen);
+    if (opt.werkstatt) k = k.filter((u) => SCHADTEIL[u]);              // nur Ursachen, die in der Werkstatt zu beheben sind
+    ursache = k[Math.floor(Math.random() * k.length)]; falle = !opt.werkstatt && Math.random() < 0.35;
+  }
   const pw = createPW(karte, ursache, falle);
   pw.t = 6 * 3600; pw.histNext = pw.t;
   const fl = pw.flut; for (let i = 0; i < 2 * 3600 / 10; i++) stepPW(pw, 10);
@@ -178,6 +188,12 @@ export function setupPW(karte) {
   pw.p.forEach((x) => { x.qMax = 0; x.heissMeld = false; });
   if (karte) { pw.li = ursache === 'luft' ? 0.85 : 1.35; pw.p[0].run = true; pw.p[1].run = false; }
   if (ursache === 'gehaeuse' || ursache === 'stopfen' || ursache === 'aussen') pw.p[0].puddle = 1.2;
+  if (opt.werkstatt) {                                                // P-001 bereits freigeschaltet und ausgebaut, P-002 in Betrieb
+    Object.assign(pw.p[0], { wahl: '0', rep: false, schloss: true, vs: 0, vd: 0, ablass: true, run: false });
+    pw.historie.unshift('Heute 06:40  P-001 außer Betrieb genommen, Einschubeinheit in die Werkstatt');
+    for (let i = 0; i < 60; i++) stepPW(pw, 10);
+    ausbauen(pw, () => {}); pw.alarme = {}; pw.p[1].qMax = 0;
+  }
   return pw;
 }
 
@@ -196,7 +212,9 @@ export function setSchloss(pw, i, an, log) {
 }
 export function setSchieber(pw, i, seite, pos, log) {
   const x = pw.p[i], k = seite === 's' ? 'vs' : 'vd', alt = x[k]; x[k] = clamp(pos, 0, 100);
-  log(`${pumpeName(i)} ${seite === 's' ? 'Saugschieber' : 'Druckschieber'} ${Math.round(alt)} → ${Math.round(x[k])} % offen${x.run ? ' (Pumpe läuft)' : ''}`);
+  const raus = x.ablass && alt <= 2 && x[k] > 2;
+  if (raus) pw.flut += 1;                                           // Abwasser schießt aus der offenen Entleerung
+  log(`${pumpeName(i)} ${seite === 's' ? 'Saugschieber' : 'Druckschieber'} ${Math.round(alt)} → ${Math.round(x[k])} % offen${x.run ? ' (Pumpe läuft)' : ''}${raus ? ' – ACHTUNG: Entleerung offen, Abwasser tritt aus!' : ''}`);
 }
 export function setAblass(pw, i, auf, log) {
   const x = pw.p[i]; x.ablass = auf;
@@ -242,4 +260,96 @@ export function messung(pw, i, art, log) {
     if (!t.length) t.push('keine Auffälligkeiten');
     const s = t.join('; '); log(`${n} Sichtprüfung: ${s}`, 'messung'); return s.charAt(0).toUpperCase() + s.slice(1) + '.';
   }
+}
+
+// ------------------------------------------------------------------ Werkstatt (Stufe 2): Ausbau der Einschubeinheit, Befund, Instandsetzung
+// Sewatec in Rückziehbauweise: Das Spiralgehäuse bleibt in der Rohrleitung, die Einschubeinheit
+// (Gehäusedeckel, Laufrad, Dichtungen, Lagerträger mit Welle und Lagern) wird mit der Kupplung ausgebaut.
+export const TEILE = [
+  { id: 'kupplung', nr: '840', name: 'Elastische Kupplung mit Elastomerkranz', preis: 45, ersetzbar: 'Elastomerkranz erneuern',
+    fkt: 'Überträgt das Drehmoment vom Motor auf die Pumpenwelle und gleicht kleine Fluchtungsfehler aus. Der Elastomerkranz ist Verschleißteil.' },
+  { id: 'gehaeuse', nr: '102', name: 'Spiralgehäuse', reinigen: true,
+    fkt: 'Sammelt das vom Laufrad beschleunigte Wasser und wandelt Geschwindigkeit in Druck um. Bleibt bei der Rückziehbauweise in der Rohrleitung eingebaut.' },
+  { id: 'verschleiss', nr: '135 / 502', name: 'Verschleißwand mit Spaltring', preis: 180, messen: 'Spaltmaß messen (Fühlerlehre)', ersetzbar: 'Verschleißwand/Spaltring erneuern',
+    fkt: 'Bildet mit dem Laufrad den engen Dichtspalt zwischen Druck- und Saugseite. Wird der Spalt durch Verschleiß größer, strömt Wasser zurück – Förderstrom und Wirkungsgrad sinken.' },
+  { id: 'mutter', nr: '922', name: 'Laufradmutter mit Sicherung', preis: 12, ersetzbar: 'Laufradmutter erneuern',
+    fkt: 'Hält das Laufrad auf dem Wellenende. Beim Lösen Drehrichtung beachten, Sicherung beim Zusammenbau erneuern.' },
+  { id: 'laufrad', nr: '230', name: 'Laufrad (Zweikanalrad ø 286)', preis: 950, reinigen: true, ersetzbar: 'Neues Laufrad einbauen',
+    fkt: 'Überträgt die Energie auf das Abwasser. Das Kanalrad hat große freie Durchgänge für Feststoffe; Fasern können sich trotzdem an den Eintrittskanten festsetzen (Zopfbildung).' },
+  { id: 'gdicht', nr: '400', name: 'Gehäusedichtung (Flachdichtung)', preis: 25, ersetzbar: 'Neue Gehäusedichtung einlegen',
+    fkt: 'Dichtet Spiralgehäuse und Gehäusedeckel gegeneinander ab. Flachdichtungen werden nach jeder Demontage erneuert.' },
+  { id: 'deckel', nr: '161', name: 'Gehäusedeckel', fkt: 'Schließt das Spiralgehäuse zur Antriebsseite und nimmt die Gleitringdichtung auf.' },
+  { id: 'glrd1', nr: '433.01', name: 'Gleitringdichtung produktseitig (mit O-Ringen)', preis: 1150, ersetzbar: 'Gleitringdichtung erneuern',
+    fkt: 'Dichtet die Welle gegen das Abwasser ab. Ein rotierender und ein stehender Gleitring (Siliciumcarbid) laufen mit einem dünnen Flüssigkeitsfilm aufeinander; Nebendichtungen (O-Ringe) dichten statisch.' },
+  { id: 'vorlage', nr: '441 / 591', name: 'Dichtungsgehäuse mit Vorlagebehälter', fkt: 'Raum zwischen den beiden Gleitringdichtungen, gefüllt mit Vorlageflüssigkeit (Wasser-Glykol) aus dem Vorlagebehälter.' },
+  { id: 'glrd2', nr: '433.02', name: 'Gleitringdichtung atmosphärenseitig', preis: 640, ersetzbar: 'Gleitringdichtung erneuern',
+    fkt: 'Dichtet den Vorlageraum nach außen ab. Wird von der Vorlageflüssigkeit geschmiert und gekühlt – ohne Vorlage läuft sie trocken.' },
+  { id: 'welle', nr: '210', name: 'Welle', preis: 620, messen: 'Rundlauf messen (Messuhr)', ersetzbar: 'Neue Welle einbauen',
+    fkt: 'Trägt das Laufrad und überträgt das Drehmoment. Rundlauffehler führen zu Unwucht und Dichtungsverschleiß.' },
+  { id: 'lager', nr: '321 / 322', name: 'Wälzlager (Satz pumpen- und antriebsseitig)', preis: 160, messen: 'Lager von Hand drehen, Lagerspiel prüfen', ersetzbar: 'Neue Lager einbauen und mit Fett befüllen',
+    fkt: 'Nehmen Radial- und Axialkräfte der Welle auf. Fettgeschmiert; Lager werden immer paarweise getauscht.' },
+  { id: 'lagertr', nr: '330', name: 'Lagerträger', fkt: 'Gehäuse für Welle und Lager, verbindet die Einschubeinheit mit dem Fuß.' },
+  { id: 'motor', nr: '800', name: 'Drehstrommotor 15 kW IE3', messen: 'Isolationsmessung (Elektrofachkraft)', fkt: 'Antrieb. Wird nicht zerlegt; elektrische Prüfung durch eine Elektrofachkraft.' },
+];
+const BEFUND = {
+  kupplung: { kupplung: 'Elastomerkranz stark abgerieben, Zähne rissig und teilweise abgeschert, schwarzer Gummistaub im Kupplungsschutz.' },
+  verschleiss: { spalt: 'Verschleißwand mit tiefen Riefen und Auswaschungen, Spalt deutlich vergrößert.' },
+  laufrad: { zopf: 'Dicker Faserzopf (Feuchttücher, Haare) um Nabe und Eintrittskanten gewickelt, Kanäle teilweise zugesetzt.', fremd: 'Stein im Laufradkanal verklemmt, eine Schaufeleintrittskante ausgebrochen – Laufrad unwuchtig.', spalt: 'Laufrad an der Saugseite leicht angelaufen, sonst in Ordnung.' },
+  gdicht: { gehaeuse: 'Flachdichtung versprödet, an einer Stelle eingerissen, Auswaschung an der Dichtfläche des Deckels.' },
+  glrd1: { glrd: 'Gleitflächen eingelaufen, umlaufende Riefen; Dichtspalt nicht mehr dicht (Abwasser im Vorlageraum).', oring: 'Gleitflächen glatt, aber O-Ring des stehenden Gleitrings gequollen und eingerissen.', trocken: 'Gleitflächen mit Brandrissen (thermische Risse) und Verfärbung – typisches Bild nach Trockenlauf.' },
+  vorlage: { glrd: 'Vorlageflüssigkeit trüb, Schlamm am Boden des Dichtungsgehäuses.', oring: 'Vorlageflüssigkeit trüb, Schlamm am Boden des Dichtungsgehäuses.', trocken: 'Vorlageflüssigkeit trüb, Schlamm am Boden des Dichtungsgehäuses.', stopfen: 'Gewinde der Verschraubung in Ordnung, Dichtring flachgedrückt.' },
+  glrd2: { aussen: 'Gleitflächen verschlissen, Riefen; Spuren von Vorlageflüssigkeit an der Atmosphärenseite.' },
+  lager: { lager: 'Pumpenseitiges Lager rau und mit spürbarem Spiel, Laufbahn mit Pittings, Fett verbraucht und dunkel verfärbt.' },
+  welle: { lager: 'Rundlauf in Ordnung; Lagersitz pumpenseitig leicht angelaufen, noch maßhaltig.' },
+};
+const MESS = {
+  verschleiss: (u) => u === 'spalt' ? 'Spaltmaß 2,4 mm (Neuzustand 0,3–0,5 mm, Grenzwert 1,0 mm)' : 'Spaltmaß 0,5 mm (Neuzustand 0,3–0,5 mm) – in Ordnung',
+  welle: (u) => `Rundlauf am Laufradsitz ${u === 'fremd' ? '0,04' : '0,02'} mm (zulässig 0,05 mm) – in Ordnung`,
+  lager: (u) => u === 'lager' ? 'Pumpenseitiges Lager läuft rau, deutliches Radialspiel – Lagerschaden' : 'Lager laufen leicht und ruhig, kein spürbares Spiel',
+  motor: () => 'Isolationswiderstand > 100 MΩ, Wicklungen symmetrisch – Motor in Ordnung',
+};
+// Welche Instandsetzung beseitigt die Ursache?
+const REPARATUR = { zopf: (t) => t.laufrad.gereinigt || t.laufrad.ersetzt, fremd: (t) => t.laufrad.ersetzt, spalt: (t) => t.verschleiss.ersetzt,
+  glrd: (t) => t.glrd1.ersetzt, oring: (t) => t.glrd1.ersetzt, trocken: (t) => t.glrd1.ersetzt, aussen: (t) => t.glrd2.ersetzt,
+  gehaeuse: (t) => t.gdicht.ersetzt, lager: (t) => t.lager.ersetzt, kupplung: (t) => t.kupplung.ersetzt };
+export const SCHADTEIL = { zopf: 'laufrad', fremd: 'laufrad', spalt: 'verschleiss', glrd: 'glrd1', oring: 'glrd1', trocken: 'glrd1', aussen: 'glrd2', gehaeuse: 'gdicht', lager: 'lager', kupplung: 'kupplung' };
+export const PUMPEN_URSACHEN = Object.keys(REPARATUR);
+
+export function befundText(pw, id) { const b = BEFUND[id] && BEFUND[id][pw.wsUrsache]; const t = pw.ws.teile[id]; if (t.ersetzt) return 'Neuteil eingebaut.'; if (t.gereinigt && id === 'laufrad') return pw.wsUrsache === 'fremd' ? 'Gereinigt, Stein entfernt – die ausgebrochene Schaufelkante bleibt.' : 'Gereinigt, Kanäle frei, Schaufeln unbeschädigt.'; return b || 'Ohne Befund – keine Verschleiß- oder Schadensspuren.'; }
+export function ausbauBereit(pw) {
+  const x = pw.p[0], f = [];
+  if (x.run) f.push('Pumpe läuft');
+  if (x.rep) f.push('Reparaturschalter nicht auf 0');
+  if (!x.schloss) f.push('Reparaturschalter nicht gegen Wiedereinschalten gesichert');
+  if (x.vd > 2) f.push('Druckschieber nicht geschlossen');
+  if (x.vs > 2) f.push('Saugschieber nicht geschlossen');
+  if (!x.ablass) f.push('Pumpe nicht entleert (Entleerung zu)');
+  return f;
+}
+export function ausbauen(pw, log) {
+  const f = ausbauBereit(pw);
+  if (f.length) { log(`P-001 Ausbau versucht, nicht freigegeben: ${f.join(', ')}`); return `Ausbau nicht zulässig: ${f.join(', ')}.`; }
+  const x = pw.p[0]; x.ausgebaut = true; x.puddle = 0; pw.flut = 0;
+  pw.wsUrsache = pw.ursache;
+  pw.ws = { kosten: 0, eingebaut: false, teile: Object.fromEntries(TEILE.map((t) => [t.id, { befund: false, gemessen: false, gereinigt: false, ersetzt: false }])) };
+  log('P-001 Einschubeinheit ausgebaut und in die Werkstatt gebracht (Spiralgehäuse bleibt eingebaut)');
+  return null;
+}
+export function teilAktion(pw, id, art, log) {
+  const T = TEILE.find((t) => t.id === id), t = pw.ws.teile[id], u = pw.wsUrsache;
+  if (art === 'befund') { t.befund = true; const b = befundText(pw, id); log(`Werkstatt Befund ${T.name}: ${b}`, 'messung'); return b; }
+  if (art === 'messen') { t.gemessen = true; const m = MESS[id](u); log(`Werkstatt ${T.messen}: ${m}`, 'messung'); return m; }
+  if (art === 'reinigen') { t.gereinigt = true; log(`Werkstatt ${T.name} gereinigt`); return befundText(pw, id); }
+  if (art === 'ersetzen') { t.ersetzt = true; pw.ws.kosten += T.preis || 0; log(`Werkstatt ${T.name}: ${T.ersetzbar} (${T.preis} €)`); return `${T.ersetzbar}.`; }
+}
+export const wsRepariert = (pw) => { const u = pw.wsUrsache; return !REPARATUR[u] || REPARATUR[u](pw.ws.teile); };
+export function einbauen(pw, log) {
+  const x = pw.p[0], t = pw.ws.teile, u = pw.wsUrsache;
+  const ok = !u || !REPARATUR[u] || REPARATUR[u](t);
+  if (REPARATUR[u] && ok) pw.ursache = null;
+  if (t.glrd1.ersetzt) { pw.glrdSchaden = false; x.trueb = 0; }
+  if (t.glrd1.ersetzt || t.glrd2.ersetzt) x.vorlage = 0;                // Dichtungsraum nach Tausch leer
+  x.ausgebaut = false; x.puddle = 0; x.qMax = 0; x.stopfenFest = x.stopfenFest || u === 'stopfen';
+  pw.ws.eingebaut = true; pw.ws.repariert = ok; pw.vorlageLeerMeld = false;
+  log(`P-001 Einschubeinheit wieder eingebaut (Ersatzteile ${pw.ws.kosten} €)`);
 }
