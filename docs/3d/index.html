@@ -106,7 +106,7 @@
   .fpi{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 10px}
   .fpi label{font-size:11px;color:#b2bec3;display:flex;align-items:center;gap:4px;white-space:nowrap}
   .fpi input{width:64px;font-size:14px;padding:3px 5px;border-radius:4px;border:1px solid #2d4a7a;background:#0f3460;color:#fff;font-family:monospace}
-  #trendB,#trendP{width:100%;height:150px;display:block;border-radius:6px;margin-top:6px}
+  #trendB,#trendP,#trendO{width:100%;height:150px;display:block;border-radius:6px;margin-top:6px}
   .card.wide{max-width:860px}
   #misList{margin-top:8px;display:flex;flex-direction:column;gap:8px}
   .misLF{background:#0f3460;border:1px solid #2d4a7a;border-radius:10px;padding:0 10px}
@@ -172,7 +172,7 @@
 <div id="hint"></div>
 <div id="joy"><div id="knob"></div></div>
 <div id="pls">
-  <h3>Leitwarte <span id="plsTabs"><button class="btn on" data-t="faul">Faulung / Gas</button><button class="btn" data-t="bel">Belüftung</button><button class="btn" data-t="pw">PW Talstraße</button></span><button class="btn" id="plsClose" aria-label="Schließen">×</button></h3>
+  <h3>Leitwarte <span id="plsTabs"><button class="btn on" data-t="faul">Faulung / Gas</button><button class="btn" data-t="bel">Belüftung</button><button class="btn" data-t="pw">PW Talstraße</button><button class="btn" data-t="ost">PW Ind.-Ost</button></span><button class="btn" id="plsClose" aria-label="Schließen">×</button></h3>
   <div id="plsBel" style="display:none">
     <div id="belVals"></div>
     <div id="belFP"></div>
@@ -185,6 +185,12 @@
     <canvas id="trendP"></canvas>
     <div class="leg">Trend 3 h, Skala 0–100 %:<i style="background:#ffd32a"></i>LI-001 (0–3 m)<i style="background:#00d2d3"></i>Q P-001 (0–150 m³/h)<i style="background:#74b9ff"></i>Q P-002<i style="background:#ff6b6b"></i>Strom P-001 (0–30 A)</div>
     <div id="pwAl"></div>
+  </div>
+  <div id="plsOst" style="display:none">
+    <div id="ostVals"></div>
+    <canvas id="trendO"></canvas>
+    <div class="leg">Trend 6 h, Skala 0–100 %:<i style="background:#ffd32a"></i>LI-101 (0–3 m)<i style="background:#00d2d3"></i>FI-101 (0–120 m³/h)<i style="background:#ff9f43"></i>Zulauf geschätzt (0–120 m³/h)<i style="background:#a29bfe"></i>Frequenz P-001 (0–50 Hz)</div>
+    <div id="ostAl"></div>
   </div>
   <div id="plsFaul">
   <div id="plsVals"></div>
@@ -272,6 +278,7 @@ import { initAnlageUI } from './js/anlage-ui.js';
 import { buildBelueftung } from './js/belueftung-szene.js';
 import { buildPumpwerk, PW_ORT, PW_WAENDE } from './js/pumpwerk-szene.js';
 import { buildBahnhof, BHF_ORT, BHF_LOCH } from './js/bahnhof.js';
+import { buildOst, OST, OST_ORT } from './js/pwost-szene.js';
 import { initWerkstatt } from './js/werkstatt.js';
 import { initMissionen } from './js/missionen.js';
 import { insts, instMeshes, updateInstruments } from './js/instrumente.js';
@@ -480,7 +487,7 @@ const sstep = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a)
   for (let i = 0; i < p.count; i++) {
     const x = p.getX(i), z = p.getZ(i);
     const out = Math.max(FENCE.x0 - x, x - FENCE.x1, FENCE.z0 - z, z - FENCE.z1, 0);
-    let y = 0.5 * (Math.sin(x * 0.031) + Math.sin(z * 0.026 + 1.2)) * sstep(0, 40, out) * sstep(14, 26, Math.hypot(x + 192, z - 70)) * sstep(16, 30, Math.hypot(x + 247, z - 72)) * (x < FENCE.x0 ? sstep(4, 12, Math.abs(z - 60)) : 1);   // eben: Pumpwerk, Zufahrtsstraße
+    let y = 0.5 * (Math.sin(x * 0.031) + Math.sin(z * 0.026 + 1.2)) * sstep(0, 40, out) * sstep(14, 26, Math.hypot(x + 192, z - 70)) * sstep(16, 30, Math.hypot(x + 247, z - 72)) * sstep(2, 14, Math.max(OST_ORT.x0 - 3 - x, x - OST_ORT.x1 - 40, OST_ORT.z0 - 26 - z, z - OST_ORT.z1 - 8, 0)) * (x < FENCE.x0 ? sstep(4, 12, Math.abs(z - 60)) : 1);   // eben: Pumpwerk, Zufahrtsstraße
     const d = creekDist(x, z), s = sstep(1.5, 6.5, d);
     y = y * s + (-1.8) * (1 - s);
     p.setY(i, y);
@@ -680,6 +687,7 @@ const bel = buildBelueftung(scene, { box, cyl, reg, M, std }, { toast: (m) => fu
 const pwt = buildPumpwerk(scene, { box, cyl, reg, M, std }, { toast: (m) => fui.toast(m), werkstatt: () => wks.open() });
 const bhf = buildBahnhof(scene, { box, reg, M, std }, { toast: (m) => fui.toast(m), openDetail: (id) => fui.openDetail(id), peek: (k) => peek(k) });
 bhf.initOverlays(fui);
+const pwo = buildOst(scene, { box, cyl, reg, M, std }, { toast: (m) => fui.toast(m) });
 // Fällmittelstation
 {
   const g = new THREE.Group();
@@ -907,6 +915,7 @@ const faul = buildFaulung(scene, { box, cyl, railing, circlePts, reg, M, std }, 
     if (x > FENCE.x0 - 4 && x < FENCE.x1 + 4 && z > FENCE.z0 - 4 && z < FENCE.z1 + 4) return false;
     if (Math.abs(z - 60) < 7 && x < FENCE.x0) return false;
     if (Math.hypot(x + 192, z - 70) < 17) return false;               // Pumpwerk Talstraße
+    if (x > 188 && x < 280 && z > -30 && z < 46) return false;         // PW Industriegebiet Ost, Gewerbehallen
     if (x < -222 && z > 52 && z < 104) return false;                   // Bahnhofstraße mit Häusern und Bahnhof
     if (Math.abs(x + 289) < 5) return false;                           // Bahnstrecke
     return creekDist(x, z) > 7.5;
@@ -1025,8 +1034,8 @@ const legend = document.getElementById('legend');
 legend.innerHTML = Object.values(FLOW).map(f => `<div><i style="background:#${new THREE.Color(f.c).getHexString()}"></i>${f.n}</div>`).join('') + '<div style="color:#8395a7;margin-top:3px">schematisch, Leitungen liegen erdverlegt</div>';
 
 // ------------------------------------------------------------------ UI: Labels, Auswahl, Rundgang
-const TOUR = ['bhf', 'talstr', 'zpw', 'rechen', 'sandfang', 'vk', 'abschlag', 'ab', 'bb', 'geblaese', 'fecl3', 'nk', 'rs', 'ablauf', 've', 'ft', 'gs', 'bhkw', 'fackel', 'sew', 'bg', 'bach'];
-const SHORT = { bhf: 'PW Bahnhofstr.', talstr: 'PW Talstraße', zpw: 'Hebewerk', rechen: 'Rechen', sandfang: 'Sandfang', vk: 'VK1/VK2', abschlag: 'SV-201', ab: 'AB-1', bb: 'Belebung', geblaese: 'Gebläse', fecl3: 'FeCl₃', nk: 'NK1/NK2', rs: 'RS-PW', ablauf: 'Ablauf', ve: 'VE-1', ft: 'FT-1', gs: 'GS-1', bhkw: 'BHKW', fackel: 'F6.1', sew: 'Z6.1/SI6.1', bg: 'Betriebsgeb.', bach: 'Schwierbach' };
+const TOUR = ['bhf', 'talstr', 'ost', 'zpw', 'rechen', 'sandfang', 'vk', 'abschlag', 'ab', 'bb', 'geblaese', 'fecl3', 'nk', 'rs', 'ablauf', 've', 'ft', 'gs', 'bhkw', 'fackel', 'sew', 'bg', 'bach'];
+const SHORT = { bhf: 'PW Bahnhofstr.', talstr: 'PW Talstraße', ost: 'PW Ind.-Ost', zpw: 'Hebewerk', rechen: 'Rechen', sandfang: 'Sandfang', vk: 'VK1/VK2', abschlag: 'SV-201', ab: 'AB-1', bb: 'Belebung', geblaese: 'Gebläse', fecl3: 'FeCl₃', nk: 'NK1/NK2', rs: 'RS-PW', ablauf: 'Ablauf', ve: 'VE-1', ft: 'FT-1', gs: 'GS-1', bhkw: 'BHKW', fackel: 'F6.1', sew: 'Z6.1/SI6.1', bg: 'Betriebsgeb.', bach: 'Schwierbach' };
 const labelBox = document.getElementById('labels');
 for (const id of TOUR) {
   const el = document.createElement('div'); el.className = 'lbl'; el.textContent = SHORT[id];
@@ -1123,7 +1132,7 @@ canvas.addEventListener('pointerup', e => {
 });
 
 // ------------------------------------------------------------------ Begehung (Ich-Perspektive) → js/begehung.js
-const walk = createWalk({ scene, camera, canvas, controls, fence: FENCE, areas: [PW_ORT, ...BHF_ORT], walls: PW_WAENDE, getInstMeshes: () => instMeshes, insts,
+const walk = createWalk({ scene, camera, canvas, controls, fence: FENCE, areas: [PW_ORT, ...BHF_ORT, OST_ORT], walls: PW_WAENDE, getInstMeshes: () => instMeshes, insts,
   onInspect: (id, msg) => fui.openDetail(id, msg),
   onPickComp: (r) => { const h = r.intersectObjects(pickables, false)[0]; if (!h || h.distance > 60) return null; select(h.object.userData.comp, false); return h.distance; },
   isBlocked: () => fui.isBlocked() });
@@ -1164,7 +1173,7 @@ const clock = new THREE.Clock(), o3 = new THREE.Object3D(), pv = new THREE.Vecto
 let elapsed = 0;
 function tick() {
   const raw = clock.getDelta(), dt = Math.min(raw, 0.1); elapsed += dt;
-  simTick(raw); faul.update(dt); bel.update(dt); pwt.update(dt); bhf.update(Math.min(1, raw), walk.active ? camera.position : null);
+  simTick(raw); faul.update(dt); bel.update(dt); pwt.update(dt); pwo.update(dt); bhf.update(Math.min(1, raw), walk.active ? camera.position : null);
   if (lampe.intensity) lampe.position.copy(camera.position); updateInstruments(dt, camera, fui.detail); fui.update(dt);
   for (const a of anims) {
     if (a.type === 'rot') a.obj.rotation.y -= a.omega * dt * speed;

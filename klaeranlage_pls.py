@@ -4444,8 +4444,8 @@ def _(
 
           <!-- PW OST -->
           <rect x="40" y="195" width="150" height="70" rx="6" fill="#16213e" stroke="#0984e3" stroke-width="1.5"/>
-          <text x="115" y="214" fill="#74b9ff" text-anchor="middle" font-size="10" font-weight="bold" font-family="monospace">PW OST</text>
-          <text x="115" y="228" fill="#b2bec3" text-anchor="middle" font-size="8" font-family="monospace">KKS: APW-02</text>
+          <text x="115" y="214" fill="#74b9ff" text-anchor="middle" font-size="10" font-weight="bold" font-family="monospace">PW INDUSTRIEGEB. OST</text>
+          <text x="115" y="228" fill="#b2bec3" text-anchor="middle" font-size="8" font-family="monospace">KKS: APW-02 · DL-02 400 m</text>
           <rect x="50" y="236" width="130" height="10" fill="#2d3436" stroke="#0f3460" stroke-width="1"/>
           <rect x="50" y="236" width="{1.3 * pw_ost_fuell}" height="10" fill="{_pw_farbe(pw_ost_fuell)}"/>
           <text x="115" y="259" fill="#dfe6e9" text-anchor="middle" font-size="9" font-family="monospace">{pw_ost_fuell:.0f} %</text>
@@ -4795,7 +4795,7 @@ def _(
 
             # Hinweis zu den anderen Pumpwerken (neutral, ohne didaktischen Bezug)
             mo.Html('''<div class="pls"><div class="pls-c" style="border-color:#0984e3">
-                <h3 style="color:#74b9ff">ℹ️ Weitere Pumpwerke (PW Ost, PW Industriepark)</h3>
+                <h3 style="color:#74b9ff">ℹ️ Weitere Pumpwerke (PW Industriegebiet Ost, PW Industriepark)</h3>
                 <p style="font-size:0.85em;color:#b2bec3;margin:0">
                     Für diese Außenstationen liegen aktuell nur die Live-Füllstände auf der Netzübersicht
                     vor. Ausführliche Bauwerksdatenblätter können auf Anforderung aus dem Bauarchiv
