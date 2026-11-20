@@ -1,10 +1,11 @@
 // Missionen: vorbereitete Betriebssituationen mit Auftrag (Briefing), Start in der Begehung,
 // Auswertung (Missionsbericht am Bildschirm und als PDF, siehe bericht.js).
 import { sim, startSzenario, logText, logA } from './anlage-sim.js';
-import { P } from './faulung-modell.js';
+import { P, fmtZeit } from './faulung-modell.js';
 import { f0, f1 } from './instrumente.js';
 import { sammleBericht, renderBericht, berichtAlsPDF } from './bericht.js';
 import { KARTEN, VOR_ORT_BEHEBBAR, TEILE, SCHADTEIL, wsRepariert } from './pumpwerk-modell.js';
+import { hAusMessung, hvLeitung } from './pwost-modell.js';
 
 const $ = (id) => document.getElementById(id);
 const hat = (re) => sim.log.some((l) => re.test(l.text));
@@ -25,6 +26,9 @@ const CH = {
   pegel: { titel: 'Pegel Pumpensumpf (LI-001)', einheit: 'm', src: 'P', min: 0, max: 3, serien: [{ key: 'li', label: 'LI-001', farbe: '#e1a100' }] },
   qpw: { titel: 'Förderstrom der Pumpen', einheit: 'm³/h', src: 'P', min: 0, max: 150, serien: [{ key: 'q1', label: 'P-001', farbe: '#00a8b5' }, { key: 'q2', label: 'P-002', farbe: '#6c5ce7', strich: true }] },
   ipw: { titel: 'Motorstrom und Schwingung P-001', einheit: 'A bzw. mm/s', src: 'P', min: 0, max: 30, serien: [{ key: 'i1', label: 'Strom P-001 [A]', farbe: '#d63031' }, { key: 'i2', label: 'Strom P-002 [A]', farbe: '#e17055', strich: true }, { key: 'v1', label: 'Schwingung P-001 [mm/s]', farbe: '#2e86de', dick: 1.4 }] },
+  ostLi: { titel: 'Pegel Pumpensumpf APW-02 (LI-101), Notüberlauf ab 2,80 m', einheit: 'm', src: 'O', min: 0, max: 3, serien: [{ key: 'li', label: 'LI-101', farbe: '#e1a100' }] },
+  ostQ: { titel: 'APW-02: Förderstrom der Pumpen und Zulauf', einheit: 'm³/h', src: 'O', min: 0, max: 120, serien: [{ key: 'q1', label: 'P-001', farbe: '#00a8b5' }, { key: 'q2', label: 'P-002', farbe: '#6c5ce7', strich: true }, { key: 'qin', label: 'Zulauf (geschätzt)', farbe: '#e67e22', dick: 1.4 }] },
+  ostF: { titel: 'Frequenz P-001 (FU)', einheit: 'Hz', src: 'O', min: 0, max: 55, serien: [{ key: 'f1', label: 'f P-001', farbe: '#a29bfe' }] },
   pgeb: { titel: 'Leistung Gebläsestation (JI 201)', einheit: 'kW', src: 'B', min: 0, max: 150, serien: [{ key: 'p', label: 'Ist-Leistung', farbe: '#d63031' }, { key: 'pr', label: 'bei richtiger O2-Messung', farbe: '#1e8e5a', strich: true }] },
 };
 
@@ -228,6 +232,57 @@ const BHF_MISSION = {
   },
 };
 
+// ------------------------------------------------------------------ PW Industriegebiet Ost: LS „Bernoulli-Gleichung / Anlagenkennlinie“
+const n2 = (x) => x.toFixed(2).replace('.', ',');
+const ostMess = () => sim.O.messungen;
+const ostGueltig = () => ostMess().filter((m) => m.p1 && !m.p2 && m.stat);
+const ostFreq = () => new Set(ostGueltig().map((m) => Math.round(m.f))).size;
+const OST_LOES = 'Ursache: Die neue Pumpe wurde für die alte Anlagenkennlinie (Druckleitung DN 150) ausgelegt: 80 m³/h bei 22 m (H_geo 18 m + ca. 4 m Rohrreibung). Durch das gleichzeitige Relining (PE-HD da 140, d_i 123,4 mm ≈ DN 125) steigen die Reibungsverluste bei gleichem Förderstrom auf mehr als das Doppelte (Diagramm: DN 150 ≈ 0,97 m/100 m, DN 125 ≈ 2,4 m/100 m bei 80 m³/h). Die Anlagenkennlinie wird steiler, der Betriebspunkt wandert nach links. Theoretische Betriebspunkte (AB, Diagramm KSB, ohne Einzelverluste): neu/DN 150 ≈ 80 m³/h bei 22 m · neu/DN 125 ≈ 63 m³/h bei 24 m · alt/DN 150 ≈ 95 m³/h bei 23 m · alt/DN 125 ≈ 72 m³/h bei 26 m · beide parallel an DN 125 ≈ 77 m³/h (die neue Pumpe liefert dabei nur noch ≈ 15 m³/h, weil ihre Nullförderhöhe von 27 m kaum über dem gemeinsamen Druck liegt). In der Simulation liegt der Betriebspunkt mit ≈ 58–60 m³/h etwas darunter: Einzelverluste im Pumpwerk (Krümmer, Rückschlagklappe, Schieber, Auslauf), tatsächlicher Innendurchmesser 123,4 statt 125 mm und der aktuelle Pegel. Der Zulauf erreicht tagsüber ≈ 75 m³/h → Rückstau. Messung mit FU: Bei abgesenkter Drehzahl liegen die Messpunkte (Q, H) auf der Anlagenkennlinie; unter ≈ 41 Hz ist die Nullförderhöhe der Pumpe kleiner als H_geo, P-001 fördert nicht mehr. Förderhöhe aus den Messwerten: H = (p_d − p_s)/(ρ·g) + Δz + (v_d² − v_s²)/(2g) mit Δz = 0,50 m, v_d im Druckstutzen DN 100, v_s im Saugstutzen DN 125. Sofortmaßnahme: Spitzenlast-Zuschaltung freigeben bzw. P-002 zusätzlich betreiben (verlangsamt den Anstieg, reicht tagsüber knapp nicht), ggf. Saugwagen. Empfehlung: Pumpe für die neue Anlagenkennlinie auslegen (größeres Laufrad bzw. steilere Kennlinie, Auslegungspunkt ≈ 80 m³/h bei ≈ 28 m), Sanierung mit geringerer Querschnittsreduzierung (z. B. Close-Fit-Liner) prüfen; künftig Pumpe und Leitung immer gemeinsam betrachten, Reserve bei der Auslegung vorsehen, Inbetriebnahme mit Messung des Betriebspunkts abnehmen.';
+const ostMission = {
+  id: 'ost_bernoulli', titel: 'PW Industriegebiet Ost: Förderstrom zu gering', bereich: 'PW Industriegebiet Ost · Hydraulik (Bernoulli, Anlagenkennlinie)', dauer: '45–60 min', stufe: 3,
+  faul: 'S0', bel: 'B0', ost: 'stoer', start: 'ost', tab: 'ost', vorlauf: 4, speed: 5,
+  auftrag: 'Die Leitwarte meldet: „Förderstrom der Pumpstation Industriegebiet Ost zu gering – Rückstau im Zulaufkanal steigt.“ Vor zwei Tagen wurde die ältere Pumpe P-001 gegen ein neues, energieeffizienteres Modell mit Frequenzumrichter getauscht; P-002 ist noch die alte Pumpe. Prüfe vor Ort, was los ist. Nimm mit dem Frequenzumrichter von P-001 eine Messreihe auf (mindestens fünf Betriebspunkte bei verschiedenen Frequenzen, jeweils über „Messwerte notieren“), aus der du die Anlagenkennlinie bestimmen kannst. Vermeide einen Abschlag über den Notüberlauf, hinterlasse das Pumpwerk im Automatikbetrieb und gib eine Meldung an die Schichtleitung ab.',
+  lehrer: `${OST_LOES} Ablauf in der Mission: Leitwarte (Pegel steigt, Förderstrom ≈ 58 m³/h statt 80) → vor Ort Typenschild, Anlagendaten, Schieber, FI-101, Manometer → Messreihe: P-002 auf 0, P-001 Wahlschalter HAND, FU Sollwertquelle ORT, 50/48/46/44/42/40 Hz einstellen, jeweils notieren → zurück auf FU FERN, Wahlschalter AUTO → Sofortmaßnahme (Spitzenlast freigeben oder P-002 parallel) → Meldung. Zeitraffer ×5; während der Messreihe steigt der Pegel schneller (geringerer Förderstrom) – zügig arbeiten oder vorher absenken.`,
+  lehrerBericht() {
+    const ms = ostGueltig();
+    const z = ms.map((m) => `${n2(m.f).replace(',00', '')} Hz: Q ${Math.round(m.q)} m³/h, H = ${hAusMessung(m).toFixed(1).replace('.', ',')} m (Anlagenkennlinie AB: ${(18 + 4 * hvLeitung(m.q, 0.125, 100)).toFixed(1).replace('.', ',')} m)`).join(' · ');
+    return `${ms.length ? `Ausgewertete Messpunkte (nur P-001, eingeschwungen): ${z}. ` : 'Keine gültigen Messpunkte. '}${OST_LOES}`;
+  },
+  checks: () => { const O = sim.O, [a, b] = O.p; return [
+    ['Betriebspunkt vor Ort erfasst (FI-101 und Drücke an P-001)', () => (hat(/angesehen: FI-101/) || hat(/angesehen: APW-02 Steuerung/)) && ((hat(/angesehen: PI 101\.1/) && hat(/angesehen: PI 101\.2/)) || hat(/angesehen: APW-02 Steuerung/)), 'Förderstrom und Förderhöhe (aus Saug- und Druckseite) ergeben den tatsächlichen Betriebspunkt, der mit der Auslegung (80 m³/h bei 22 m) verglichen wird.'],
+    ['Anlagendaten bzw. Typenschild der neuen Pumpe angesehen', () => hat(/angesehen: Doku APW-02/) || hat(/angesehen: P-001 \(Kreiselpumpe P-001 \(neue/), 'Auslegungspunkt der Pumpe und Daten der sanierten Druckleitung sind die Grundlage der Analyse.'],
+    ['Stellung von Saug- und Druckschieber P-001 geprüft', () => hat(/angesehen: V-101\.1/) && hat(/angesehen: V-101\.2/), 'Einfache betriebliche Ursachen (gedrosselter Schieber nach dem Umbau) zuerst ausschließen.'],
+    ['Messreihe: mindestens 5 Messpunkte bei verschiedenen Frequenzen', () => ostFreq() >= 5, 'Bei abgesenkter Drehzahl verschiebt sich die Pumpenkennlinie, die Anlagenkennlinie bleibt – die Messpunkte liegen auf der Anlagenkennlinie.'],
+    ['Messpunkte nur mit P-001 in Betrieb aufgenommen', () => ostMess().some((m) => m.p1) && ostMess().filter((m) => m.p1).every((m) => !m.p2), 'FI-101 misst den Förderstrom beider Pumpen zusammen; laufen beide, gehören Q und die Drücke von P-001 nicht zusammen.'],
+    ['Messpunkt bei 50 Hz (Normalbetrieb) enthalten', () => ostGueltig().some((m) => m.f > 49.5), 'Der Betriebspunkt im Normalbetrieb ist der Vergleichswert zum Auslegungspunkt.'],
+    ['Unterer Bereich gemessen (Frequenz unter 43 Hz)', () => ostGueltig().some((m) => m.f < 43), 'Nahe der Nullförderung nähert sich die Anlagenkennlinie H_geo; unter ≈ 41 Hz fördert P-001 nicht mehr.'],
+    ['Sofortmaßnahme: P-002 zusätzlich in Betrieb genommen', () => O.spitze || hat(/APW-02 P-002 Wahlschalter AUTO → HAND/), 'Zusätzliche Förderung über die alte Pumpe verlangsamt den Rückstau (Spitzenlast-Zuschaltung freigeben oder Parallelbetrieb).'],
+    ['Kein Notüberlauf während des Einsatzes', () => O.vUeb < 0.5, 'Ein Abschlag ungereinigten Abwassers ins Gewässer ist meldepflichtig.'],
+    ['Pumpwerk im Automatikbetrieb hinterlassen (AUTO, FU FERN, Schieber offen)', () => O.p.every((x) => x.wahl === 'auto' && x.rep && x.vs > 95 && x.vd > 95) && !a.fuOrt, 'Nach der Messung muss die Niveausteuerung wieder übernehmen – HAND ohne Pegelschutz kann den Sumpf leerfahren.'],
+    ['Meldung an die Schichtleitung abgegeben', meldung, 'Befund (Betriebspunkt statt Auslegungspunkt), Ursache (steilere Anlagenkennlinie nach Relining), Sofortmaßnahme und Empfehlung.'],
+  ]; },
+  tabellen: () => [{ titel: 'Notierte Messwerte APW-02', sub: 'Werte, wie sie beim Notieren an FU, FI-101 und Pumpensteuerung abgelesen wurden.',
+    kopf: ['Nr.', 'Uhrzeit', 'f P-001 [Hz]', 'FI-101 [m³/h]', 'PT 101.1 [bar]', 'PT 101.2 [bar]', 'LI-101 [m]', 'in Betrieb'],
+    zeilen: ostMess().map((m) => [String(m.nr), fmtZeit(m.t), m.p1 ? m.f.toFixed(1).replace('.', ',') : '–', String(Math.round(m.q)), n2(m.ps), n2(m.pd), n2(m.li), [m.p1 ? 'P-001' : '', m.p2 ? 'P-002' : ''].filter(Boolean).join(' + ') || '–']),
+    breiten: [10, 18, 24, 24, 24, 24, 20, 34] }],
+  werte: () => { const O = sim.O, z = (x) => !x.rep ? 'Rep.-Sch. 0' : `${x.run ? 'Betrieb' : 'bereit'}, ${({ hand: 'HAND', '0': '0', auto: 'AUTO' })[x.wahl]}`; return [['Pegel LI-101', n2(O.li), 'm'], ['Förderstrom FI-101', f0(O.q), 'm³/h'], ['P-001', `${z(O.p[0])}${O.p[0].fuOrt ? ', FU ORT' : ''}`, ''], ['P-002', z(O.p[1]), ''], ['Spitzenlast-Zuschaltung', O.spitze ? 'frei' : 'gesperrt', ''], ['Notüberlauf seit Start', f0(O.vUeb), 'm³']]; },
+  charts: [CH.ostLi, CH.ostQ, CH.ostF],
+  kennzahl: () => { const O = sim.O; return `Seit Missionsstart gefördert ${f0(O.vGef)} m³ mit ${f1(O.eKwh)} kWh (${O.vGef > 1 ? f0(O.eKwh / O.vGef * 1000) : '–'} Wh/m³). Notierte Messpunkte: ${ostMess().length}, davon auswertbar ${ostGueltig().length}.${O.vUeb > 0 ? ` Über den Notüberlauf abgeschlagen: ${f0(O.vUeb)} m³.` : ''}`; },
+  hinweise: () => {
+    const O = sim.O, h = [], ms = ostMess();
+    h.push(`Messpunkte notiert: ${ms.length} (verschiedene Frequenzen, nur P-001, eingeschwungen: ${ostFreq()}).`);
+    if (ms.some((m) => m.p1 && m.p2)) h.push('Mindestens ein Messpunkt wurde notiert, während beide Pumpen liefen – Förderstrom und Drücke von P-001 passen dann nicht zusammen.');
+    if (ms.some((m) => m.p1 && !m.stat)) h.push('Mindestens ein Messpunkt wurde notiert, bevor die Frequenz eingeschwungen war.');
+    if (ms.some((m) => !m.p1)) h.push('Es wurden Werte notiert, während P-001 stand.');
+    if (hat(/P-001 läuft länger ohne Förderstrom/)) h.push('P-001 lief längere Zeit ohne Förderstrom (Frequenz zu niedrig) – die Pumpe erwärmt sich, Messpunkt nur kurz anfahren.');
+    if (O.p[0].fuOrt) h.push('Der FU von P-001 steht noch auf Sollwertquelle ORT.');
+    if (O.p.some((x) => x.wahl !== 'auto')) h.push('Eine Pumpe steht nicht in AUTO.');
+    if (O.vUeb > 0) h.push(`Der Notüberlauf sprang an: ${f0(O.vUeb)} m³ ungereinigtes Abwasser.`);
+    if (hat(/APW-02 P-00\d (Saug|Druck)schieber \d+ → \d+/)) h.push('Schieber wurden verstellt – bei einer Messreihe für die Anlagenkennlinie müssen sie ganz offen bleiben.');
+    return h;
+  },
+};
+
 // Gruppierung und Nummerierung nach Lernfeldern (Umwelttechnologe für Abwasserbewirtschaftung)
 export const LERNFELDER = [
   { lf: 0, titel: 'Einstieg', sub: 'alle Ausbildungsjahre' },
@@ -237,7 +292,8 @@ export const LERNFELDER = [
   { lf: 15, titel: 'Abwassertechnische Anlagen steuern und regeln', sub: '3. Ausbildungsjahr' },
 ];
 const ZUORDNUNG = { frei: [0, '0', 'Einweisung'], bhf: [4, '4.1', 'Bauwerke prüfen'], pw_K1: [6, '6.1', 'Störungskarten Pumpwerk Talstraße'], pw_K2: [6, '6.2', 'Störungskarten Pumpwerk Talstraße'], pw_K3: [6, '6.3', 'Störungskarten Pumpwerk Talstraße'], pw_K4: [6, '6.4', 'Störungskarten Pumpwerk Talstraße'],
-  pw_zufall: [6, '6.5', 'Zufallskarte und Instandsetzung'], pw_werkstatt: [6, '6.6', 'Zufallskarte und Instandsetzung'], pw_komplett: [6, '6.7', 'Zufallskarte und Instandsetzung'], bhkw: [12, '12.1', 'Faulung und Gasverwertung'], heizung: [12, '12.2', 'Faulung und Gasverwertung'], geblaese: [15, '15.1', 'Belüftungsregelung'] };
+  pw_zufall: [6, '6.5', 'Zufallskarte und Instandsetzung'], pw_werkstatt: [6, '6.6', 'Zufallskarte und Instandsetzung'], pw_komplett: [6, '6.7', 'Zufallskarte und Instandsetzung'], bhkw: [12, '12.1', 'Faulung und Gasverwertung'], heizung: [12, '12.2', 'Faulung und Gasverwertung'], geblaese: [15, '15.1', 'Belüftungsregelung'],
+  ost_bernoulli: [6, '6.8', 'Pumpe und Druckleitung (Anlagenkennlinie)'] };
 
 export const MISSIONEN = [
   {
@@ -334,6 +390,7 @@ export const MISSIONEN = [
   BHF_MISSION,
   ...Object.keys(KARTEN).map((k) => pwMission(k)),
   ...['zufall', 'werkstatt', 'komplett'].map((art) => ({ ...pwMission('K1', art), wuerfel: () => pwMission(Object.keys(KARTEN)[Math.floor(Math.random() * 4)], art) })),
+  ostMission,
 ];
 
 export function initMissionen({ ui, walk, wks, setExam, bhf }) {
@@ -364,7 +421,7 @@ export function initMissionen({ ui, walk, wks, setExam, bhf }) {
     if (m.wuerfel) m = Object.assign(m.wuerfel(), { nr: m.nr, lf: m.lf });
     m = Object.assign(Object.create(Object.getPrototypeOf(m)), m, { titel: `Mission ${m.nr}: ${m.titel}` });
     const exam = $('misExam').checked; ui.erklaer = !exam; setExam(exam);
-    startSzenario({ faul: m.faul, bel: m.bel, pw: m.pw || null, pwOpt: m.pwOpt || {}, speed: m.speed || +$('spSel').value, titel: `Mission „${m.titel}“${exam ? ' (Prüfungsmodus)' : ''}` });
+    startSzenario({ faul: m.faul, bel: m.bel, pw: m.pw || null, pwOpt: m.pwOpt || {}, ost: m.ost || null, speed: m.speed || +$('spSel').value, titel: `Mission „${m.titel}“${exam ? ' (Prüfungsmodus)' : ''}` });
     if (m.onStart) m.onStart();
     ui.diagnose = !!m.pw;
     aktiv = m; ctx = { t0: performance.now(), tSim0: sim.S.t, exam, werteStart: m.werte ? m.werte() : [] };
