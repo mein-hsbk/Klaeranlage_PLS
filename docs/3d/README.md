@@ -88,3 +88,18 @@ Im Prüfungsmodus sind Beschriftungen, Schnellwahl und Erklärtexte ausgeblendet
 Neue Instrumente entstehen in den `*-szene.js`-Dateien mit `makeInst(id, { name, tag, pos, rotY, size, draw, info, actions })`.
 Kollision: Alle sichtbaren Meshes zwischen 0,3 m und 1,6 m Höhe wirken als Hindernis (Bounding Box);
 dünne Teile wie Rohrleitungen werden mit `userData.noCol = true` ausgenommen.
+
+## Pumpwerk Bahnhofstraße – Sammelbecken (`js/bahnhof.js`)
+
+Außenstation APW-01 an der Bahnhofstraße (westlich des PW Talstraße, Begehungspunkt „PW Bahnhofstraße“):
+unterirdisches Sammelbecken 8,00 × 5,00 m, nutzbare Tiefe 5,00 m (wie Bauwerksdatenblatt im PLS), Pumpensumpf mit
+zwei Tauchmotorpumpen, Zulauf Druckrohr DN 300 mit Prallplatte, Notüberlauf DN 400, Schieberschacht, Schaltschrank,
+Lüftung mit Aktivkohlefilter, Grundwassermessstelle, Lageplan im Bestandsordner.
+
+- Deckel öffnen und mit Handlampe hineinsehen (Kamera unter der Öffnung, umsehen per Ziehen).
+- Maße nachprüfen: Innenmaße (Laser), Loten (Schlammauflage ≈ 0,36 m), Wasserstand, Zulauf-/Überlaufhöhe, Wand-/Deckenstärke,
+  Pumpensumpf, Grundwasserstand, Betonzustand (Abklopfen, Rückprallhammer).
+- Zulauf/Ablauf prüfen: Zulauf begutachten, Füllversuch (Pumpen 120 s sperren) und Pumpversuch P1, Armaturen und Druck im Schieberschacht.
+- Becken leerpumpen (Sohle, Ablagerungen und Pumpen sichtbar), kleine Arbeiten selbst (Zöpfe, Treibgut, Stopfbuchse),
+  Aufträge an Fremdfirmen (Saugspülfahrzeug, Steigleiter, Aktivkohle, Bauwerksuntersuchung, Vermessung).
+- „Kapazität bewerten“: eigene Werte und Empfehlung (reicht/Reinigung/Aufstockung/Anbau/Neubau) ins Protokoll – keine automatische Lösung.

@@ -18,6 +18,7 @@ export const STATIONEN = {
   nk: { n: 'Nachklärung', p: [102, 4, 102, -18] },
   rs: { n: 'RS-Pumpwerk', p: [82, -36, 72, -40] },
   talstr: { n: 'PW Talstraße', p: [-187.6, 67.4, -190.6, 68.3] },
+  bahnhof: { n: 'PW Bahnhofstraße', p: [-246.2, 63.2, -248.4, 70] },
 };
 
 export function createWalk({ scene, camera, canvas, controls, fence, areas = [], walls = [], getInstMeshes, insts, onInspect, onPickComp, isBlocked }) {
@@ -64,6 +65,7 @@ export function createWalk({ scene, camera, canvas, controls, fence, areas = [],
   }
 
   function goTo(key) {
+    W.unpeek && W.unpeek();
     const [x, z, tx, tz] = STATIONEN[key].p;
     Object.assign(P, { x, z, yaw: Math.atan2(tx - x, -(tz - z)), pitch: -0.22 });
     for (const b of document.querySelectorAll('#walkSt .btn')) b.classList.toggle('on', b.dataset.k === key);
@@ -79,6 +81,7 @@ export function createWalk({ scene, camera, canvas, controls, fence, areas = [],
   };
   W.exit = () => {
     if (!W.active) return;
+    W.unpeek();
     W.active = false; controls.enabled = true;
     camera.fov = camSave.fov; camera.near = camSave.near; camera.updateProjectionMatrix(); camera.rotation.order = 'XYZ';
     camera.position.copy(camSave.pos); controls.target.copy(camSave.tgt); camera.lookAt(camSave.tgt);
@@ -111,7 +114,7 @@ export function createWalk({ scene, camera, canvas, controls, fence, areas = [],
     if (joy && e.pointerId === joy.id) { joy.dx = Math.max(-60, Math.min(60, e.clientX - joy.x0)); joy.dy = Math.max(-60, Math.min(60, e.clientY - joy.y0)); showJoy(); }
     else if (look && e.pointerId === look.id) {
       const k = e.pointerType === 'touch' ? 0.006 : 0.004;
-      P.yaw += (e.clientX - look.x) * k; P.pitch = Math.max(-1.3, Math.min(1.3, P.pitch - (e.clientY - look.y) * k));
+      P.yaw += (e.clientX - look.x) * k; P.pitch = Math.max(W.peekCfg ? -1.5 : -1.3, Math.min(1.3, P.pitch - (e.clientY - look.y) * k));
       moved += Math.abs(e.clientX - look.x) + Math.abs(e.clientY - look.y); look.x = e.clientX; look.y = e.clientY;
     }
   });
@@ -139,8 +142,13 @@ export function createWalk({ scene, camera, canvas, controls, fence, areas = [],
   }
   $('hint').onclick = () => hint && onInspect(hint);
 
+  // Blick durch eine Öffnung (Kamera fest, nur umsehen)
+  W.peekCfg = null;
+  W.peek = (c) => { if (!W.peekCfg) W.peekSave = { yaw: P.yaw, pitch: P.pitch }; W.peekCfg = c; P.yaw = c.yaw; P.pitch = c.pitch; setHint(null); };
+  W.unpeek = () => { if (!W.peekCfg) return; W.peekCfg = null; Object.assign(P, W.peekSave); };
   const fwd = new THREE.Vector3();
   W.update = (dt) => {
+    if (W.peekCfg) { camera.position.set(...W.peekCfg.p); P.pitch = Math.max(-1.5, P.pitch); camera.rotation.set(P.pitch, -P.yaw, 0); return; }
     if (!isBlocked()) {
       let fx = 0, fz = 0;
       if (keys.KeyW || keys.ArrowUp) fz += 1; if (keys.KeyS || keys.ArrowDown) fz -= 1;

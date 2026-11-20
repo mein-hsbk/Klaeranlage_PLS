@@ -49,6 +49,8 @@
   body.walking #walkbar{display:block}
   #walkSt,#walkTools{display:flex;gap:6px;overflow-x:auto}
   #walkTools{margin-top:7px}
+  #peekBar{position:fixed;left:50%;top:calc(env(safe-area-inset-top) + 60px);transform:translateX(-50%);display:none;gap:8px;align-items:center;background:#16213ef0;border:1px solid #ffd54a;color:#ffeaa7;border-radius:10px;padding:7px 10px;font-size:13px;z-index:5;max-width:94vw;flex-wrap:wrap;justify-content:center}
+  #auf label,#bew label{display:block;margin:8px 0 4px;font-size:13px;color:#b2bec3}
   #walkSt .btn,#walkTools .btn{font-size:12px;padding:6px 9px}
   #walkTools .hint{flex:1;font-size:11px;color:#8395a7;align-self:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   #cross{position:fixed;left:50%;top:50%;width:6px;height:6px;margin:-3px;border-radius:50%;background:#fff9;box-shadow:0 0 0 1px #0006;pointer-events:none;display:none}
@@ -181,6 +183,23 @@
   <div style="display:flex;align-items:flex-start;gap:8px"><div style="flex:1"><h2 id="dTitle"></h2><div class="sub" id="dName"></div></div><button class="btn" id="dClose" aria-label="Schließen">×</button></div>
   <canvas id="dcv"></canvas><div id="dInfo"></div><div id="dAct"></div>
 </div></div>
+<div id="peekBar"><span>🔦 Blick ins Bauwerk: <b id="peekName"></b> · ziehen = umsehen</span><button class="btn" id="peekAct">Messen / Aktionen</button><button class="btn on" id="peekBack">↑ Zurück</button></div>
+<div class="ov" id="auf"><div class="card">
+  <div style="display:flex;align-items:flex-start;gap:8px"><div style="flex:1"><h2>Auftrag erteilen · APW-01 Bahnhofstraße</h2><div class="sub">Reinigung oder Reparatur beauftragen. Der Auftrag wird im Protokoll vermerkt.</div></div><button class="btn" id="aufClose" aria-label="Schließen">×</button></div>
+  <label for="aufArt">Mangel / Leistung</label><select id="aufArt"></select>
+  <label for="aufDring">Dringlichkeit</label><select id="aufDring"><option>sofort</option><option>innerhalb einer Woche</option><option selected>nächste Wartung</option></select>
+  <label for="aufText">Hinweise an den Ausführenden</label><textarea id="aufText" style="width:100%;min-height:70px;font-size:16px;border-radius:6px;padding:8px;background:#0f3460;color:#fff;border:1px solid #2d4a7a;box-sizing:border-box" placeholder="z. B. Zugang, Sicherheitsmaßnahmen, Maße, Befund"></textarea>
+  <div style="display:flex;justify-content:flex-end;margin-top:10px"><button class="btn on" id="aufOk">Auftrag erteilen</button></div>
+</div></div>
+<div class="ov" id="bew"><div class="card">
+  <div style="display:flex;align-items:flex-start;gap:8px"><div style="flex:1"><h2>Kapazitätsbewertung · Sammelbecken Bahnhofstraße</h2><div class="sub">Eigene Ergebnisse notieren. Sie werden mit Zeitstempel ins Protokoll übernommen (Kopieren über „Protokoll“).</div></div><button class="btn" id="bewClose" aria-label="Schließen">×</button></div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap"><div style="flex:1;min-width:140px"><label for="bewVerf">Erforderliches Volumen [m³]</label><input id="bewVerf" inputmode="decimal" style="width:100%;box-sizing:border-box;font-size:16px;padding:7px;border-radius:6px;background:#0f3460;color:#fff;border:1px solid #2d4a7a"></div>
+  <div style="flex:1;min-width:140px"><label for="bewVvorh">Vorhandenes nutzbares Volumen [m³]</label><input id="bewVvorh" inputmode="decimal" style="width:100%;box-sizing:border-box;font-size:16px;padding:7px;border-radius:6px;background:#0f3460;color:#fff;border:1px solid #2d4a7a"></div></div>
+  <label for="bewVar">Empfehlung</label><select id="bewVar"><option>Becken reicht aus</option><option>Reicht nach Reinigung aus</option><option>Aufstockung (Wände erhöhen)</option><option>Erweiterung durch zusätzliches Becken (Anbau)</option><option>Neubau</option><option>Weitere Untersuchung nötig</option></select>
+  <label for="bewDh">Kennwert der Variante (z. B. Aufstockung um … m, Zusatzvolumen …)</label><input id="bewDh" style="width:100%;box-sizing:border-box;font-size:16px;padding:7px;border-radius:6px;background:#0f3460;color:#fff;border:1px solid #2d4a7a">
+  <label for="bewText">Begründung (Befunde vor Ort)</label><textarea id="bewText" style="width:100%;min-height:90px;font-size:16px;border-radius:6px;padding:8px;background:#0f3460;color:#fff;border:1px solid #2d4a7a;box-sizing:border-box"></textarea>
+  <div style="display:flex;justify-content:flex-end;margin-top:10px"><button class="btn on" id="bewOk">Im Protokoll notieren</button></div>
+</div></div>
 <div class="ov" id="meld"><div class="card">
   <h2>Meldung an die Schichtleitung</h2>
   <div class="sub">Befund, vermutete Ursache, durchgeführte oder vorgeschlagene Maßnahme</div>
@@ -225,7 +244,7 @@
   </div>
   <div id="walkbar">
     <div id="walkSt"></div>
-    <div id="walkTools"><button class="btn" id="bMis2">🎯 Missionen</button><button class="btn" id="bMeld">Meldung</button><button class="btn" id="bLog">Protokoll</button><span class="hint">W A S D gehen · Ziehen umsehen · E / Klick: Instrument · Tab: Leitwarte</span></div>
+    <div id="walkTools"><button class="btn" id="bMis2">🎯 Missionen</button><button class="btn" id="bAuf" style="display:none">📝 Auftrag</button><button class="btn" id="bBew" style="display:none">📊 Kapazität bewerten</button><button class="btn" id="bMeld">Meldung</button><button class="btn" id="bLog">Protokoll</button><span class="hint">W A S D gehen · Ziehen umsehen · E / Klick: Instrument · Tab: Leitwarte</span></div>
   </div>
 </div>
 <div id="load">3D-Modell wird geladen …</div>
@@ -237,11 +256,12 @@ import { buildFaulung } from './js/faulung-szene.js';
 import { initAnlageUI } from './js/anlage-ui.js';
 import { buildBelueftung } from './js/belueftung-szene.js';
 import { buildPumpwerk, PW_ORT, PW_WAENDE } from './js/pumpwerk-szene.js';
+import { buildBahnhof, BHF_ORT, BHF_LOCH } from './js/bahnhof.js';
 import { initWerkstatt } from './js/werkstatt.js';
 import { initMissionen } from './js/missionen.js';
 import { insts, instMeshes, updateInstruments } from './js/instrumente.js';
 import { createWalk } from './js/begehung.js';
-import { simTick, sim } from './js/anlage-sim.js';
+import { simTick, sim, logA } from './js/anlage-sim.js';
 const fui = initAnlageUI();
 const wks = initWerkstatt(fui);
 
@@ -445,7 +465,7 @@ const sstep = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a)
   for (let i = 0; i < p.count; i++) {
     const x = p.getX(i), z = p.getZ(i);
     const out = Math.max(FENCE.x0 - x, x - FENCE.x1, FENCE.z0 - z, z - FENCE.z1, 0);
-    let y = 0.5 * (Math.sin(x * 0.031) + Math.sin(z * 0.026 + 1.2)) * sstep(0, 40, out) * sstep(14, 26, Math.hypot(x + 192, z - 70)) * (x < FENCE.x0 ? sstep(4, 12, Math.abs(z - 60)) : 1);   // eben: Pumpwerk, Zufahrtsstraße
+    let y = 0.5 * (Math.sin(x * 0.031) + Math.sin(z * 0.026 + 1.2)) * sstep(0, 40, out) * sstep(14, 26, Math.hypot(x + 192, z - 70)) * sstep(16, 30, Math.hypot(x + 247, z - 72)) * (x < FENCE.x0 ? sstep(4, 12, Math.abs(z - 60)) : 1);   // eben: Pumpwerk, Zufahrtsstraße
     const d = creekDist(x, z), s = sstep(1.5, 6.5, d);
     y = y * s + (-1.8) * (1 - s);
     p.setY(i, y);
@@ -458,6 +478,15 @@ const sstep = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a)
     col.set([c.r, c.g, c.b], i * 3);
   }
   g.setAttribute('color', new THREE.BufferAttribute(col, 3)); g.computeVertexNormals();
+  { // Aussparung für das unterirdische Sammelbecken Bahnhofstraße (Becken von innen einsehbar)
+    const idx = g.index.array, keep = [], [hx0, hx1, hz0, hz1] = BHF_LOCH;
+    for (let i = 0; i < idx.length; i += 3) {
+      const cx = (p.getX(idx[i]) + p.getX(idx[i + 1]) + p.getX(idx[i + 2])) / 3, cz = (p.getZ(idx[i]) + p.getZ(idx[i + 1]) + p.getZ(idx[i + 2])) / 3;
+      if (cx > hx0 && cx < hx1 && cz > hz0 && cz < hz1) continue;
+      keep.push(idx[i], idx[i + 1], idx[i + 2]);
+    }
+    g.setIndex(keep);
+  }
   const ground = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 }));
   ground.receiveShadow = true; scene.add(ground);
 
@@ -634,6 +663,8 @@ scene.add(bubbleMesh);
 // Gebläsestation, Luftverteilung, Sondenausleger (begehbar, mit Belüftungssimulation) → js/belueftung-szene.js
 const bel = buildBelueftung(scene, { box, cyl, reg, M, std }, { toast: (m) => fui.toast(m) });
 const pwt = buildPumpwerk(scene, { box, cyl, reg, M, std }, { toast: (m) => fui.toast(m), werkstatt: () => wks.open() });
+const bhf = buildBahnhof(scene, { box, reg, M, std }, { toast: (m) => fui.toast(m), openDetail: (id) => fui.openDetail(id), peek: (k) => peek(k) });
+bhf.initOverlays(fui);
 // Fällmittelstation
 {
   const g = new THREE.Group();
@@ -861,6 +892,8 @@ const faul = buildFaulung(scene, { box, cyl, railing, circlePts, reg, M, std }, 
     if (x > FENCE.x0 - 4 && x < FENCE.x1 + 4 && z > FENCE.z0 - 4 && z < FENCE.z1 + 4) return false;
     if (Math.abs(z - 60) < 7 && x < FENCE.x0) return false;
     if (Math.hypot(x + 192, z - 70) < 17) return false;               // Pumpwerk Talstraße
+    if (x < -222 && z > 52 && z < 104) return false;                   // Bahnhofstraße mit Häusern und Bahnhof
+    if (Math.abs(x + 289) < 5) return false;                           // Bahnstrecke
     return creekDist(x, z) > 7.5;
   };
   for (let n = 0; n < 2500 && T.length < 260; n++) {
@@ -977,8 +1010,8 @@ const legend = document.getElementById('legend');
 legend.innerHTML = Object.values(FLOW).map(f => `<div><i style="background:#${new THREE.Color(f.c).getHexString()}"></i>${f.n}</div>`).join('') + '<div style="color:#8395a7;margin-top:3px">schematisch, Leitungen liegen erdverlegt</div>';
 
 // ------------------------------------------------------------------ UI: Labels, Auswahl, Rundgang
-const TOUR = ['talstr', 'zpw', 'rechen', 'sandfang', 'vk', 'abschlag', 'ab', 'bb', 'geblaese', 'fecl3', 'nk', 'rs', 'ablauf', 've', 'ft', 'gs', 'bhkw', 'fackel', 'sew', 'bg', 'bach'];
-const SHORT = { talstr: 'PW Talstraße', zpw: 'Hebewerk', rechen: 'Rechen', sandfang: 'Sandfang', vk: 'VK1/VK2', abschlag: 'SV-201', ab: 'AB-1', bb: 'Belebung', geblaese: 'Gebläse', fecl3: 'FeCl₃', nk: 'NK1/NK2', rs: 'RS-PW', ablauf: 'Ablauf', ve: 'VE-1', ft: 'FT-1', gs: 'GS-1', bhkw: 'BHKW', fackel: 'F6.1', sew: 'Z6.1/SI6.1', bg: 'Betriebsgeb.', bach: 'Schwierbach' };
+const TOUR = ['bhf', 'talstr', 'zpw', 'rechen', 'sandfang', 'vk', 'abschlag', 'ab', 'bb', 'geblaese', 'fecl3', 'nk', 'rs', 'ablauf', 've', 'ft', 'gs', 'bhkw', 'fackel', 'sew', 'bg', 'bach'];
+const SHORT = { bhf: 'PW Bahnhofstr.', talstr: 'PW Talstraße', zpw: 'Hebewerk', rechen: 'Rechen', sandfang: 'Sandfang', vk: 'VK1/VK2', abschlag: 'SV-201', ab: 'AB-1', bb: 'Belebung', geblaese: 'Gebläse', fecl3: 'FeCl₃', nk: 'NK1/NK2', rs: 'RS-PW', ablauf: 'Ablauf', ve: 'VE-1', ft: 'FT-1', gs: 'GS-1', bhkw: 'BHKW', fackel: 'F6.1', sew: 'Z6.1/SI6.1', bg: 'Betriebsgeb.', bach: 'Schwierbach' };
 const labelBox = document.getElementById('labels');
 for (const id of TOUR) {
   const el = document.createElement('div'); el.className = 'lbl'; el.textContent = SHORT[id];
@@ -1075,7 +1108,7 @@ canvas.addEventListener('pointerup', e => {
 });
 
 // ------------------------------------------------------------------ Begehung (Ich-Perspektive) → js/begehung.js
-const walk = createWalk({ scene, camera, canvas, controls, fence: FENCE, areas: [PW_ORT], walls: PW_WAENDE, getInstMeshes: () => instMeshes, insts,
+const walk = createWalk({ scene, camera, canvas, controls, fence: FENCE, areas: [PW_ORT, ...BHF_ORT], walls: PW_WAENDE, getInstMeshes: () => instMeshes, insts,
   onInspect: (id, msg) => fui.openDetail(id, msg),
   onPickComp: (r) => { const h = r.intersectObjects(pickables, false)[0]; if (!h || h.distance > 60) return null; select(h.object.userData.comp, false); return h.distance; },
   isBlocked: () => fui.isBlocked() });
@@ -1085,9 +1118,22 @@ document.getElementById('bWalk').onclick = e => {
 };
 const _enter = walk.enter;
 walk.enter = (k) => { _enter(k); const b = document.getElementById('bWalk'); b.classList.add('on'); b.textContent = '⬆ Luftbild'; };
+// Blick ins Sammelbecken Bahnhofstraße durch eine geöffnete Öffnung (Handlampe)
+const lampe = new THREE.PointLight(0xfff4dc, 0, 18, 1); scene.add(lampe);
+function peek(k) {
+  const c = bhf.PEEK[k]; document.getElementById('detail').style.display = 'none'; fui.detail.id = null;
+  walk.peek(c); lampe.intensity = 2.2; document.getElementById('peekName').textContent = c.n; document.getElementById('peekBar').style.display = 'flex'; peekInst = c.inst;
+  logA(`APW-01 Blick ins Bauwerk: ${c.n} (Handlampe)`, 'blick');
+}
+let peekInst = null;
+const unpeek = () => { walk.unpeek(); lampe.intensity = 0; document.getElementById('peekBar').style.display = 'none'; };
+document.getElementById('peekBack').onclick = unpeek;
+document.getElementById('peekAct').onclick = () => { const id = peekInst; fui.openDetail(id); };
+document.getElementById('bAuf').onclick = () => bhf.oeffneAuftrag();
+document.getElementById('bBew').onclick = () => bhf.oeffneBewertung();
 initMissionen({ ui: fui, walk, wks, setExam: (on) => document.body.classList.toggle('exam', on) });
 const _exit = walk.exit;
-walk.exit = () => { _exit(); const b = document.getElementById('bWalk'); b.classList.remove('on'); b.textContent = '🚶 Begehen'; layout(); };
+walk.exit = () => { unpeek(); _exit(); const b = document.getElementById('bWalk'); b.classList.remove('on'); b.textContent = '🚶 Begehen'; layout(); };
 
 function layout() {
   const bh = document.getElementById('bottom').offsetHeight;
@@ -1103,7 +1149,8 @@ const clock = new THREE.Clock(), o3 = new THREE.Object3D(), pv = new THREE.Vecto
 let elapsed = 0;
 function tick() {
   const raw = clock.getDelta(), dt = Math.min(raw, 0.1); elapsed += dt;
-  simTick(raw); faul.update(dt); bel.update(dt); pwt.update(dt); updateInstruments(dt, camera, fui.detail); fui.update(dt);
+  simTick(raw); faul.update(dt); bel.update(dt); pwt.update(dt); bhf.update(Math.min(1, raw), walk.active ? camera.position : null);
+  if (lampe.intensity) lampe.position.copy(camera.position); updateInstruments(dt, camera, fui.detail); fui.update(dt);
   for (const a of anims) {
     if (a.type === 'rot') a.obj.rotation.y -= a.omega * dt * speed;
     else { a.s = (a.s ?? 0) + a.v * dt * speed; const L = a.b - a.a, ph = a.s % (2 * L); a.obj.position.x = a.a + (ph < L ? ph : 2 * L - ph); }
