@@ -103,3 +103,10 @@ Lüftung mit Aktivkohlefilter, Grundwassermessstelle, Lageplan im Bestandsordner
 - Becken leerpumpen (Sohle, Ablagerungen und Pumpen sichtbar), kleine Arbeiten selbst (Zöpfe, Treibgut, Stopfbuchse),
   Aufträge an Fremdfirmen (Saugspülfahrzeug, Steigleiter, Aktivkohle, Bauwerksuntersuchung, Vermessung).
 - „Kapazität bewerten“: eigene Werte und Empfehlung (reicht/Reinigung/Aufstockung/Anbau/Neubau) ins Protokoll – keine automatische Lösung.
+
+## Missionsübersicht
+
+Missionen sind nach Lernfeldern (Umwelttechnologe/-in für Abwasserbewirtschaftung) gruppiert und nummeriert
+(`LERNFELDER`, `ZUORDNUNG` in `js/missionen.js`): 0 Freies Üben · LF 4: 4.1 Sammelbecken Bahnhofstraße prüfen ·
+LF 6: 6.1–6.4 Störungskarten PW Talstraße, 6.5 Zufallskarte, 6.6 Werkstatt, 6.7 Störung bis Wiederinbetriebnahme ·
+LF 12: 12.1 BHKW steht, 12.2 Faulturm kühlt aus · LF 15: 15.1 Stromfresser Gebläsestation.

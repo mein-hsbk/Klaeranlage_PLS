@@ -20,11 +20,12 @@ export function buildBahnhof(scene, h, hooks = {}) {
   const makeInst = makeInstFactory(scene, M);
   const noCol = (o) => { o.traverse((m) => { m.userData.noCol = true; }); return o; };
   const { x0, x1, z0, z1, wand: t, sohle, ok } = BHF, xm = (x0 + x1) / 2, zm = (z0 + z1) / 2;
-  const B = {
+  const B0 = () => ({
     h: 1.25, sed: 0.36, schwimm: true, zopf: true, treibgut: true, leiter: 'alt', filter: 'alt', sLeck: true, deckel: 'alt', beton: 'befund',
     p: [{ run: false, bh: 26480 }, { run: false, bh: 3120 }], modus: 'auto', sperre: 0, sperreH0: 0, test: null,
-    offen: { ein: false, zieh: false, rev: false, sch: false }, auftraege: [], saug: 0, t: 8 * 3600, peek: null,
-  };
+    offen: { ein: false, zieh: false, rev: false, sch: false }, auftraege: [], saug: 0, t: 8 * 3600, peek: null, hist: [], vUeb: 0, ueber: false,
+  });
+  const B = B0(); sim.H = B;
 
   const g = new THREE.Group();
   // ---------------------------------------------------------------- Oberfläche: Pflaster mit Aussparungen, Decken, Zaun
@@ -198,7 +199,8 @@ export function buildBahnhof(scene, h, hooks = {}) {
     const qp = B.test ? Q_P[0] : (lauf[0] ? Q_P[0] : 0) + (lauf[1] ? Q_P[1] : 0);
     let vol = V(B.h) + (zulauf() - qp) * dt;
     B.h = vol >= 0 ? vol / A : Math.max(-1, vol / A_SUMPF);
-    if (B.h > BHF.nue - sohle) { B.h = BHF.nue - sohle + 0.02; B.ueber = true; } else B.ueber = false;
+    if (B.h > BHF.nue - sohle) { B.vUeb += (B.h - (BHF.nue - sohle)) * A; B.h = BHF.nue - sohle; if (!B.ueber) logA('APW-01 Notüberlauf springt an', 'alarm'); B.ueber = true; } else B.ueber = false;
+    if (!B.hist.length || B.t - B.hist[B.hist.length - 1].t >= 60) B.hist.push({ t: B.t, h: B.h, qz: zulauf() * 1000, np: (lauf[0] ? 1 : 0) + (lauf[1] ? 1 : 0) });
     if (B.saug > 0) { B.saug -= dt; B.sed = Math.max(0.02, B.sed - dt / 1800 * 0.34); if (B.saug <= 0) { B.sed = 0.02; B.schwimm = false; logA('APW-01 Reinigung abgeschlossen: Sohle und Pumpensumpf gesaugt, Schwimmschlamm entfernt (ca. 14 m³ Sand/Schlamm entsorgt)', 'sys'); toast('Reinigung abgeschlossen.'); } }
     for (const a of B.auftraege) if (!a.fertig && B.t >= a.fertigT) { a.fertig = true; a.wirkung(); logA(`APW-01 Auftrag erledigt: ${a.text}`, 'sys'); }
   }
@@ -363,8 +365,11 @@ export function buildBahnhof(scene, h, hooks = {}) {
     };
   }
 
+  let tLast = null;
   function update(dt, camPos) {
-    step(dt * (sim.speed || 1));
+    const ts = sim.S.t; if (tLast === null) { tLast = ts; B.t = ts; }
+    let d = Math.max(0, Math.min(600, ts - tLast)); tLast = ts;
+    while (d > 0) { const k = Math.min(5, d); step(k); d -= k; }
     wasser.position.y = sohle + Math.max(B.h, BHF.sumpf - sohle + 0.02);
     wasser.scale.x = B.h < 0 ? 0.2 : 1; wasser.position.x = B.h < 0 ? (PS[0] + PS[1]) / 2 : xm; wasser.scale.z = B.h < 0 ? 0.6 : 1;
     schwimm.visible = B.schwimm && B.h > B.sed; schwimm.position.set(xm - 0.8, wasser.position.y + 0.01, zm);
@@ -379,5 +384,12 @@ export function buildBahnhof(scene, h, hooks = {}) {
   // Blickpunkte in die Öffnungen (Kamera knapp unter der Decke, Handlampe)
   const PEEK = { ein: { p: [-250.4, -0.45, 72.3], yaw: 0.93, pitch: -0.55, n: 'Einstieg', inst: 'bh_ein' }, rev: { p: [-250.75, -0.35, 70.5], yaw: -Math.PI / 2, pitch: -0.62, n: 'Zulauf und Notüberlauf', inst: 'bh_rev' },
     zieh: { p: [-244.9, -0.45, 70.5], yaw: -Math.PI / 2, pitch: -1.3, n: 'Pumpensumpf', inst: 'bh_zieh' }, sch: { p: [-242.6, -0.25, 70.6], yaw: 0, pitch: -1.2, n: 'Schieberschacht', inst: 'bh_sch' } };
-  return { update, B, PEEK, initOverlays, oeffneAuftrag, oeffneBewertung, mess: (k) => insts[INST_D[k]] };
+  // Neustart (Mission): Ausgangszustand mit 2 h Vorlauf für die Diagramme
+  function reset() {
+    Object.assign(B, B0()); tLast = sim.S.t; B.t = sim.S.t - 7200;
+    for (let k = 0; k < 7200; k += 5) step(5);
+    leiterNeu.visible = false; leiterAlt.visible = true; lkw.visible = false; deckelSetzen();
+  }
+  const lastH = () => ({ t: B.t, h: B.h, qz: zulauf() * 1000, np: B.p.filter((p) => p.run).length });
+  return { update, reset, lastH, B, PEEK, initOverlays, oeffneAuftrag, oeffneBewertung, mess: (k) => insts[INST_D[k]] };
 }

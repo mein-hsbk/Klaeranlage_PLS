@@ -14,6 +14,8 @@ const min = (l) => (l ? Math.round(l.tr / 60000) : null);
 
 // Diagrammvorlagen für den Bericht
 const CH = {
+  bhfPegel: { titel: 'Pegel Sammelbecken APW-01 (über Beckensohle)', einheit: 'm', src: 'H', min: -1, max: 5.2, serien: [{ key: 'h', label: 'Pegel', farbe: '#e1a100' }] },
+  bhfQ: { titel: 'Zufluss Druckrohr DN 300 und laufende Pumpen', einheit: 'L/s bzw. Anzahl × 10', src: 'H', min: 0, max: 80, serien: [{ key: 'qz', label: 'Zufluss [L/s]', farbe: '#00a8b5' }, { key: 'np', label: 'Pumpen in Betrieb × 10', farbe: '#d63031', f: 10, strich: true }] },
   gas: { titel: 'Gasspeicher GS-1 (LI 609), Fackelbetrieb orange hinterlegt', einheit: '%', src: 'S', min: 0, max: 100, band: { key: 'f' }, serien: [{ key: 'lvl', label: 'Füllstand LI 609', farbe: '#e1a100' }] },
   bhkw: { titel: 'BHKW und Faulgas', einheit: 'kW bzw. Nm³/h', src: 'S', min: 0, max: 140, serien: [{ key: 'pel', label: 'BHKW P el [kW]', farbe: '#0097a7' }, { key: 'q', label: 'Faulgas FI 608 [Nm³/h]', farbe: '#e67e22', strich: true }] },
   temp: { titel: 'Faulturmtemperatur (TI 1001)', einheit: '°C', src: 'S', min: 28, max: 40, serien: [{ key: 'T', label: 'TI 1001', farbe: '#d63031' }] },
@@ -168,6 +170,75 @@ function pwMission(karte, art = 'karte') {
   };
 }
 
+// ------------------------------------------------------------------ Sammelbecken Bahnhofstraße (LS 4.1: Kapazität prüfen)
+let BH = null;                                   // API aus bahnhof.js (initMissionen)
+const zahl = (re) => { const l = [...sim.log].reverse().find((x) => /^BEWERTUNG/.test(x.text)); if (!l) return NaN; const m = l.text.match(re); if (!m) return NaN; const t = m[1]; return parseFloat(t.includes(',') ? t.replace(/\./g, '').replace(',', '.') : t); };
+const bewertung = () => [...sim.log].reverse().find((x) => /^BEWERTUNG/.test(x.text));
+const empf = () => { const b = bewertung(); return b ? (b.text.match(/Empfehlung: ([^·(]+)/) || [])[1]?.trim() || '' : ''; };
+function bhfChecks() {
+  const B = BH.B;
+  return [
+    ['Bauwerk von innen begutachtet (Deckel geöffnet, hineingeleuchtet)', () => hat(/APW-01 Blick ins Bauwerk/), 'Zustand und Einbauten lassen sich nur durch die Öffnungen beurteilen. Einsteigen wäre nur mit Freimessen, Höhensicherung und Sicherungsposten zulässig (DGUV Regel 103-003).'],
+    ['Innenmaße nachgemessen (Länge, Breite)', () => hat(/APW-01 Innenmaße gemessen/), 'Die Unterlagen stammen von 1987, spätere Umbauten sind nicht dokumentiert – Maße vor einer Berechnung vor Ort prüfen.'],
+    ['Tiefe gelotet und Ablagerungen festgestellt', () => hat(/APW-01 Gelotet ab OK Deckel/), 'Das Lot zeigt die feste Sohle und die weiche Schlammauflage. Ablagerungen verringern das nutzbare Volumen.'],
+    ['Notüberlaufschwelle eingemessen (Obergrenze des Speichervolumens)', () => hat(/APW-01 Notüberlaufschwelle/), 'Speichern lässt sich nur bis zur Notüberlaufschwelle; darüber läuft das Abwasser ungereinigt ab.'],
+    ['Zulauf geprüft (Höhenlage bzw. Zustand)', () => hat(/APW-01 Zulauf DN 300: Rohrsohle/) || hat(/APW-01 Zulauf: Druckrohr/), 'Lage und Zustand des Zulaufs bestimmen, wie hoch eingestaut werden darf, und zeigen Verzopfungen.'],
+    ['Zufluss vor Ort bestimmt (Füllversuch)', () => hat(/APW-01 Füllversuch beendet/), 'Aus Pegelanstieg, Zeit und Beckenfläche ergibt sich der Zufluss (Q = A · Δh / Δt) – ein Abgleich mit dem Wert aus den Unterlagen (Q = v · A).'],
+    ['Ablauf geprüft (Schieberschacht, Druck der Sammelleitung)', () => hat(/APW-01 Schieberschacht:/) || hat(/APW-01 Manometer Sammelleitung/), 'Schieber offen, Rückschlagklappen funktionsfähig, Druck plausibel – sonst fördern die Pumpen nicht wie erwartet.'],
+    ['Steigeisen geprüft', () => hat(/APW-01 Steigeisen|APW-01 Steigleiter/), 'Korrodierte oder fehlende Steigeisen sind eine Absturzgefahr für alle, die später einsteigen.'],
+    ['Betonzustand untersucht (Abklopfen oder Rückprallhammer)', () => hat(/APW-01 Wand im Gasraum|APW-01 Rückprallhammer/), 'Im Gasraum greift biogene Schwefelsäure den Beton an. Für eine Aufstockung muss die vorhandene Wand tragfähig sein.'],
+    ['Grundwasserstand gemessen', () => hat(/GWM 3: Abstich/), 'Für Anbau oder Neubau entscheidend: Baugrube, Wasserhaltung, Auftriebssicherheit des leeren Beckens.'],
+    ['Lageplan aus dem Bestandsordner ausgewertet', () => hat(/angesehen: Lageplan/), 'Grundstücksgrenze, freie Fläche und Leitungen im Gehweg begrenzen, wo erweitert werden kann.'],
+    ['Kleine Mängel selbst behoben (Zöpfe, Treibgut, Stopfbuchse)', () => !B.zopf && !B.treibgut && !B.sLeck, 'Was ohne Fremdfirma und ohne Einsteigen möglich ist, wird bei der Begehung gleich erledigt.'],
+    ['Reinigung der Sohle beauftragt (Saugspülfahrzeug)', () => hat(/AUFTRAG APW-01 an Kanalreinigung/), 'Die Ablagerungen nehmen Speichervolumen weg und faulen – Reinigung durch Fremdfirma mit Saugspülfahrzeug.'],
+    ['Erneuerung der Steigleiter beauftragt', () => hat(/AUFTRAG APW-01 an Schlosserei/), 'Defekte Steigeisen werden durch eine Edelstahl-Steigleiter mit Steigschutz ersetzt.'],
+    ['Weitere Mängel gemeldet (Aktivkohlefilter, Betonschäden)', () => hat(/AUFTRAG APW-01 an Fachfirma Lüftung/) && hat(/AUFTRAG APW-01 an Ingenieurbüro/), 'Geruchsbeschwerden und freiliegende Bewehrung müssen weiterverfolgt werden.'],
+    ['Erforderliches Speichervolumen richtig bestimmt (≈ 229 m³)', () => { const v = zahl(/V erforderlich ([\d.,]+)/); return v >= 224 && v <= 234; }, 'Q_SR = v_SR · A = 1,8 m/s · π/4 · (0,30 m)² ≈ 0,127 m³/s; über 30 min: V ≈ 229 m³.'],
+    ['Vorhandenes nutzbares Volumen plausibel (≈ 200 m³, bei Ablagerungen weniger)', () => { const v = zahl(/V vorhanden ([\d.,]+)/); return v >= 180 && v <= 205; }, 'L · B · nutzbare Tiefe (Sohle bis Notüberlaufschwelle) ≈ 8,0 · 5,0 · 5,0 m = 200 m³; mit Schlammauflage weniger.'],
+    ['Empfehlung berücksichtigt das Volumendefizit', () => { const e = empf(); return !!e && !/reicht aus|nach Reinigung/i.test(e); }, 'Auch nach der Reinigung fehlen rund 30 m³ – das Becken reicht für die Betreibervorgabe nicht aus.'],
+    ['Aufstockung nur mit Untersuchung der Tragfähigkeit', () => !/Aufstockung/.test(empf()) || hat(/AUFTRAG APW-01 an Ingenieurbüro/), 'Eine Aufstockung belastet die vorhandenen Wände zusätzlich; bei Betonkorrosion im Gasraum ist vorher eine Bauwerksuntersuchung nötig.'],
+    ['Kein Notüberlauf durch eigene Versuche ausgelöst', () => B.vUeb < 0.5, 'Füll- und Pumpversuche nur bei ausreichender Reserve bis zur Überlaufschwelle durchführen.'],
+    ['Anlage ordnungsgemäß verlassen (Pumpen in AUTO, alle Deckel geschlossen)', () => B.modus === 'auto' && B.sperre <= 0 && !Object.values(B.offen).some(Boolean), 'Offene Deckel sind eine Absturzgefahr; die Pumpen müssen wieder automatisch nach Pegel schalten.'],
+    ['Meldung an die Vorgesetzte abgegeben', () => hat(/^MELDUNG an Schichtleitung/), 'Ergebnis der Kapazitätsprüfung, Befunde, erledigte Arbeiten und erteilte Aufträge.'],
+  ];
+}
+const BHF_MISSION = {
+  id: 'bhf', titel: 'Sammelbecken Bahnhofstraße prüfen', bereich: 'Außenstation APW-01 · Bauwerk', dauer: '45–60 min', stufe: 2, faul: 'S0', bel: 'B0', start: 'bahnhof', tab: null, vorlauf: 2, speed: 5,
+  onStart: () => BH && BH.reset(),
+  auftrag: 'Aufgrund zunehmender Starkregenereignisse soll geprüft werden, ob das ältere Sammelbecken am Pumpwerk Bahnhofstraße bei Starkregen den Zufluss 30 Minuten lang speichern kann. Prüfe vor Ort Maße, Zustand, Zulauf und Ablauf, erledige kleine Mängel selbst und beauftrage Reinigung und Reparaturen. Beurteile, ob das Becken ausreicht oder ob eine Aufstockung, ein Anbau oder ein Neubau nötig ist, und notiere deine Kapazitätsbewertung. Gib zum Schluss eine Meldung an deine Vorgesetzte ab.',
+  auftragStart: '„Das Sammelbecken vom Pumpwerk an der Bahnhofstraße ist schon etwas älter. Ich möchte wissen, ob es bei Starkregen den Zufluss 30 Minuten lang aufnehmen kann – und falls nicht, ob wir es erweitern können oder neu bauen müssen. Schauen Sie sich das Becken vor Ort an, prüfen Sie die Maße aus den alten Unterlagen nach (Bauwerksdatenblatt und Skizze in der Leitwarte unter Außenanlagen), sehen Sie sich Zulauf und Ablauf an und lassen Sie reinigen bzw. reparieren, was nötig ist. Ihre Bewertung notieren Sie bitte und schicken mir anschließend eine kurze Meldung.“',
+  lehrer: 'Lösung: Q_SR = 1,8 m/s · π/4 · 0,30² m² ≈ 0,127 m³/s (127 L/s); V_erf = 0,127 · 1.800 s ≈ 229 m³. Vorhanden: 8,0 · 5,0 · 5,0 m = 200 m³ (vor Ort 7,98 × 4,99 m, nutzbare Tiefe Sohle bis Notüberlaufschwelle 5,00 m; Schlammauflage ≈ 0,36 m kostet zusätzlich rund 14 m³). Defizit ≈ 29 m³ → reicht auch nach Reinigung nicht. Aufstockung um ≥ 0,73 m (29 m³ / 40 m²) hebt den Höchstwasserstand über Gelände: Wände ≈ 1 m über Gelände verlängern, neue Decke, Notüberlauf und Lüftung anheben; Zulauf ist eine Druckleitung, Einstau hydraulisch unkritisch. Gegen eine Aufstockung sprechen Betonkorrosion im Gasraum (Rückprall R ≈ 21–25) und die unbekannte Statik → Bauwerksuntersuchung. Alternative: zweite Kammer/Anbau auf der freien Grünfläche westlich (Grundwasser 2,35 m unter Gelände → Wasserhaltung, Auftriebssicherung); Neubau, wenn die Bausubstanz nicht mehr sanierungsfähig ist. Füllversuch: Pegelanstieg ≈ 12–14 cm in 120 s bei A ≈ 40 m² → Q ≈ 40–47 L/s (Trockenwetter, Datenblatt 42 L/s). Kleine Mängel vor Ort: Zöpfe an der Prallplatte, Treibgut an der Überlaufschwelle, Stopfbuchse Schieber P2. Aufträge: Saugspülfahrzeug, Steigleiter, Aktivkohlefilter, Ingenieurbüro (Beton).',
+  checks: bhfChecks,
+  werte: () => { const B = BH.B; return [['Pegel über Sohle', B.h.toFixed(2).replace('.', ','), 'm'], ['Ablagerungen', f0(B.sed * 100), 'cm'], ['Offene Deckel', String(Object.values(B.offen).filter(Boolean).length), ''], ['Pumpenbetrieb', B.modus === 'auto' ? 'AUTO' : 'HAND leerpumpen', ''], ['Erteilte Aufträge', String(sim.log.filter((l) => /^AUFTRAG APW-01/.test(l.text)).length), ''], ['Notüberlauf seit Start', f1(BH.B.vUeb), 'm³']]; },
+  charts: [CH.bhfPegel, CH.bhfQ],
+  kennzahlTitel: 'Notierte Kapazitätsbewertung',
+  kennzahl: () => { const b = bewertung(); return b ? b.text.replace(/^BEWERTUNG Kapazität APW-01: /, 'Notierte Bewertung: ') : 'Es wurde keine Kapazitätsbewertung notiert.'; },
+  hinweise: () => {
+    const h = [], B = BH.B;
+    const mess = sim.log.filter((l) => /^APW-01 (Innenmaße|Gelotet|Abstich|Notüberlaufschwelle|Zulauf DN|Füllversuch beendet|Pumpversuch P1 beendet|An der Einstieg|Pumpensumpf:|Rückprall|Grundwasser)/.test(l.text) || /GWM 3/.test(l.text));
+    if (mess.length) h.push(`Messergebnisse: ${mess.map((l) => l.text.replace(/^APW-01 /, '')).join(' | ')}`);
+    if (!bewertung()) h.push('Es wurde keine Kapazitätsbewertung notiert (Schaltschrank bzw. „Kapazität bewerten“).');
+    if (/nach Reinigung/i.test(empf())) h.push('Die Reinigung bringt nur rund 14 m³ zurück – das Defizit von etwa 29 m³ bleibt.');
+    if (/reicht aus/i.test(empf()) && !/nach Reinigung/i.test(empf())) h.push('Mit rund 200 m³ nutzbarem Volumen werden die erforderlichen ≈ 229 m³ nicht erreicht.');
+    if (B.modus === 'leer') h.push('Das Becken wurde im Handbetrieb leergepumpt und nicht wieder auf AUTO gestellt.');
+    if (Object.values(B.offen).some(Boolean)) h.push('Beim Verlassen waren noch Deckel offen.');
+    if (B.vUeb > 0.5) h.push(`Der Notüberlauf ist angesprungen (${f1(B.vUeb)} m³).`);
+    if (B.zopf || B.treibgut || B.sLeck) h.push(`Nicht erledigt: ${[B.zopf && 'Zöpfe an der Prallplatte', B.treibgut && 'Treibgut an der Überlaufschwelle', B.sLeck && 'Stopfbuchse Schieber P2'].filter(Boolean).join(', ')}.`);
+    return h;
+  },
+};
+
+// Gruppierung und Nummerierung nach Lernfeldern (Umwelttechnologe für Abwasserbewirtschaftung)
+export const LERNFELDER = [
+  { lf: 0, titel: 'Einstieg', sub: 'alle Ausbildungsjahre' },
+  { lf: 4, titel: 'Umwelttechnische Anlagen und Leitungsnetze betreiben', sub: '1. Ausbildungsjahr' },
+  { lf: 6, titel: 'Stoffe fördern', sub: '2. Ausbildungsjahr' },
+  { lf: 12, titel: 'Schlämme behandeln', sub: '3. Ausbildungsjahr' },
+  { lf: 15, titel: 'Abwassertechnische Anlagen steuern und regeln', sub: '3. Ausbildungsjahr' },
+];
+const ZUORDNUNG = { frei: [0, '0', 'Einweisung'], bhf: [4, '4.1', 'Bauwerke prüfen'], pw_K1: [6, '6.1', 'Störungskarten Pumpwerk Talstraße'], pw_K2: [6, '6.2', 'Störungskarten Pumpwerk Talstraße'], pw_K3: [6, '6.3', 'Störungskarten Pumpwerk Talstraße'], pw_K4: [6, '6.4', 'Störungskarten Pumpwerk Talstraße'],
+  pw_zufall: [6, '6.5', 'Zufallskarte und Instandsetzung'], pw_werkstatt: [6, '6.6', 'Zufallskarte und Instandsetzung'], pw_komplett: [6, '6.7', 'Zufallskarte und Instandsetzung'], bhkw: [12, '12.1', 'Faulung und Gasverwertung'], heizung: [12, '12.2', 'Faulung und Gasverwertung'], geblaese: [15, '15.1', 'Belüftungsregelung'] };
+
 export const MISSIONEN = [
   {
     id: 'frei', titel: 'Freies Üben', bereich: 'Gesamte Anlage', dauer: 'offen', stufe: 1, faul: 'S0', bel: 'B0', start: 'leitwarte', tab: 'faul', vorlauf: 2,
@@ -260,19 +331,27 @@ export const MISSIONEN = [
       return h;
     },
   },
+  BHF_MISSION,
   ...Object.keys(KARTEN).map((k) => pwMission(k)),
-  ...['zufall', 'komplett', 'werkstatt'].map((art) => ({ ...pwMission('K1', art), wuerfel: () => pwMission(Object.keys(KARTEN)[Math.floor(Math.random() * 4)], art) })),
+  ...['zufall', 'werkstatt', 'komplett'].map((art) => ({ ...pwMission('K1', art), wuerfel: () => pwMission(Object.keys(KARTEN)[Math.floor(Math.random() * 4)], art) })),
 ];
 
-export function initMissionen({ ui, walk, wks, setExam }) {
+export function initMissionen({ ui, walk, wks, setExam, bhf }) {
+  BH = bhf || null;
   let aktiv = null, ctx = null, bericht = null;
   const stars = (n) => '★'.repeat(n) + '☆'.repeat(3 - n);
-  $('misList').innerHTML = MISSIONEN.map((m) => `<div class="mis">
-    <div class="misT"><b>${m.titel}</b><span class="st" title="Schwierigkeit">${stars(m.stufe)}</span></div>
-    <div class="misM">${m.bereich} · ${m.dauer}${m.speed ? ` · Zeitraffer ×${m.speed}` : ''}</div>
-    <p>${m.auftrag}</p>
-    <details><summary>Lösungshinweise (Lehrkräfte)</summary><p>${m.lehrer}</p></details>
-    <button class="btn on" data-m="${m.id}">▶ Mission starten</button></div>`).join('');
+  for (const m of MISSIONEN) { const z = ZUORDNUNG[m.id] || [0, '–', '']; [m.lf, m.nr, m.gruppe] = z; }
+  const nrSort = (a, b) => a.nr.localeCompare(b.nr, 'de', { numeric: true });
+  $('misList').innerHTML = LERNFELDER.map((L) => {
+    const ms = MISSIONEN.filter((m) => m.lf === L.lf).sort(nrSort); if (!ms.length) return '';
+    let grp = null;
+    return `<details class="misLF" ${L.lf === 0 ? '' : 'open'}><summary><span class="lfN">${L.lf ? `LF ${L.lf}` : '★'}</span><span class="lfT">${L.titel}<small>${L.sub} · ${ms.length} ${ms.length === 1 ? 'Mission' : 'Missionen'}</small></span></summary>` +
+      ms.map((m) => { const kopf = m.gruppe !== grp ? `<div class="misG">${(grp = m.gruppe)}</div>` : '';
+        return `${kopf}<details class="misI"><summary><span class="misNr">${m.nr}</span><span class="misTi">${m.titel}</span><span class="st" title="Schwierigkeit">${stars(m.stufe)}</span><span class="misD">${m.dauer}</span></summary>
+        <div class="misB"><div class="misM">${m.bereich}${m.speed ? ` · Zeitraffer ×${m.speed}` : ''}</div><p>${m.auftrag}</p>
+        <details class="misL"><summary>Lösungshinweise (Lehrkräfte)</summary><p>${m.lehrer}</p></details>
+        <button class="btn on" data-m="${m.id}">▶ Mission ${m.nr} starten</button></div></details>`; }).join('') + '</details>';
+  }).join('');
   ui.overlays.push('mis', 'brief', 'ausw');
 
   const open = () => { $('spSel').value = String(sim.speed); $('mis').style.display = 'flex'; };
@@ -282,16 +361,18 @@ export function initMissionen({ ui, walk, wks, setExam }) {
   $('misList').onclick = (e) => {
     const id = e.target.dataset.m; if (!id) return;
     let m = MISSIONEN.find((x) => x.id === id);
-    if (m.wuerfel) m = m.wuerfel();
+    if (m.wuerfel) m = Object.assign(m.wuerfel(), { nr: m.nr, lf: m.lf });
+    m = Object.assign(Object.create(Object.getPrototypeOf(m)), m, { titel: `Mission ${m.nr}: ${m.titel}` });
     const exam = $('misExam').checked; ui.erklaer = !exam; setExam(exam);
     startSzenario({ faul: m.faul, bel: m.bel, pw: m.pw || null, pwOpt: m.pwOpt || {}, speed: m.speed || +$('spSel').value, titel: `Mission „${m.titel}“${exam ? ' (Prüfungsmodus)' : ''}` });
+    if (m.onStart) m.onStart();
     ui.diagnose = !!m.pw;
     aktiv = m; ctx = { t0: performance.now(), tSim0: sim.S.t, exam, werteStart: m.werte ? m.werte() : [] };
     $('mis').style.display = 'none';
     $('briefT').textContent = m.titel; $('briefM').textContent = `${m.bereich} · ${m.dauer}`; $('briefA').textContent = m.auftragStart || m.auftrag;
     $('brief').style.display = 'flex'; $('misBar').style.display = 'flex'; document.body.classList.add('mission'); $('misName').textContent = m.titel;
   };
-  $('briefGo').onclick = () => { $('brief').style.display = 'none'; walk.enter(aktiv ? aktiv.start : 'leitwarte'); if (aktiv) { ui.showPLS(aktiv.tab); if (aktiv.werkstattStart && !ctx.wsGeoeffnet) { ctx.wsGeoeffnet = true; wks.open(); } } };
+  $('briefGo').onclick = () => { $('brief').style.display = 'none'; walk.enter(aktiv ? aktiv.start : 'leitwarte'); if (aktiv) { if (aktiv.tab) ui.showPLS(aktiv.tab); if (aktiv.werkstattStart && !ctx.wsGeoeffnet) { ctx.wsGeoeffnet = true; wks.open(); } } };
   $('bAuftrag').onclick = () => { $('brief').style.display = 'flex'; };
 
   $('bEnde').onclick = () => {

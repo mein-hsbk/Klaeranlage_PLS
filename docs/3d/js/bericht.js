@@ -16,11 +16,11 @@ export function sammleBericht(m, ctx) {
   const checks = ((typeof m.checks === 'function' ? m.checks() : m.checks) || []).map(([text, f, warum]) => ({ text, ok: !!f(), warum: warum || '' }));
   const ende = m.werte ? m.werte() : [];
   const werte = (ctx.werteStart || []).map(([n, v, u], i) => [n, v, ende[i] ? ende[i][1] : '–', u]);
-  const hist = { S: [...sim.S.hist, { t: tEnd, ...lastS() }], B: [...sim.B.hist, { t: tEnd, ...lastB() }], P: [...sim.P.hist, { t: tEnd, ...lastP() }] };
+  const hist = { S: [...sim.S.hist, { t: tEnd, ...lastS() }], B: [...sim.B.hist, { t: tEnd, ...lastB() }], P: [...sim.P.hist, { t: tEnd, ...lastP() }], H: sim.H ? [...sim.H.hist, { t: tEnd, h: sim.H.h, qz: (sim.H.hist.at(-1) || {}).qz, np: sim.H.p.filter((p) => p.run).length }] : [] };
   return {
     titel: m.titel, bereich: m.bereich, name: ctx.name || '', datum: new Date().toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'short' }),
     dauer: mmss(performance.now() - ctx.t0), simVon: zeit(tStart), simBis: zeit(tEnd), speed: sim.speed, exam: ctx.exam,
-    auftrag: m.auftragStart || m.auftrag, checks, kennzahl: m.kennzahl ? m.kennzahl() : '', werte,
+    auftrag: m.auftragStart || m.auftrag, checks, kennzahl: m.kennzahl ? m.kennzahl() : '', kzTitel: m.kennzahlTitel || 'Energie / Kennzahl', werte,
     charts: (m.charts || []).map((c) => ({ ...c, t0: tStart - (m.vorlauf || 2) * 3600, t1: tEnd, tStart, data: hist[c.src] })),
     hinweise: m.hinweise ? m.hinweise(ereignisse) : [], ereignisse, alarme,
     meldungen: ereignisse.filter((e) => e.art === 'meldung').map((e) => e.text.replace(/^MELDUNG an Schichtleitung: /, '')),
@@ -169,7 +169,7 @@ export async function berichtAlsPDF(r, { musterloesung = false } = {}) {
       if (c.warum) text(c.warum, { size: 8.8, color: [90, 98, 108], x: M + 6, w: CW - 6, gap: 1.6 });
     }
   }
-  if (r.kennzahl) { h2('Energie / Kennzahl'); text(r.kennzahl, { size: 10 }); }
+  if (r.kennzahl) { h2(r.kzTitel); text(r.kennzahl, { size: 10 }); }
   if (r.hinweise.length) { h2('Beobachtungen zum Vorgehen'); for (const h of r.hinweise) text(`•  ${h}`, { size: 9.6 }); }
   if (r.werte.length) { h2('Prozesswerte zu Beginn und am Ende'); tabelle(['Größe', 'Start', 'Ende', 'Einheit'], r.werte, [86, 30, 30, CW - 146]); }
   if (r.charts.length) {

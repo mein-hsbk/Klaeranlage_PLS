@@ -108,7 +108,22 @@
   .fpi input{width:64px;font-size:14px;padding:3px 5px;border-radius:4px;border:1px solid #2d4a7a;background:#0f3460;color:#fff;font-family:monospace}
   #trendB,#trendP{width:100%;height:150px;display:block;border-radius:6px;margin-top:6px}
   .card.wide{max-width:860px}
-  #misList{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px;margin-top:8px}
+  #misList{margin-top:8px;display:flex;flex-direction:column;gap:8px}
+  .misLF{background:#0f3460;border:1px solid #2d4a7a;border-radius:10px;padding:0 10px}
+  .misLF>summary{list-style:none;cursor:pointer;display:flex;gap:10px;align-items:center;padding:9px 0}
+  .misLF>summary::-webkit-details-marker{display:none}
+  .lfN{background:#ffd54a;color:#16213e;font-weight:bold;border-radius:6px;padding:3px 7px;font-size:12.5px;white-space:nowrap;min-width:38px;text-align:center}
+  .lfT{font-size:14.5px;color:#ffeaa7;font-weight:bold;display:flex;flex-direction:column}.lfT small{font-weight:normal;color:#74b9ff;font-size:11.5px}
+  .misLF[open]>summary{border-bottom:1px solid #2d4a7a;margin-bottom:4px}
+  .misG{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#8395a7;margin:8px 0 3px}
+  .misI{border-bottom:1px solid #1d3a66}.misI:last-child{border-bottom:none}
+  .misI>summary{list-style:none;cursor:pointer;display:flex;gap:10px;align-items:baseline;padding:7px 2px;font-size:13.5px}
+  .misI>summary::-webkit-details-marker{display:none}
+  .misI>summary:hover{background:#13396b}
+  .misNr{font-family:monospace;color:#ffd54a;min-width:34px;font-weight:bold}.misTi{flex:1;color:#fff}.misI .st{color:#fdcb6e;white-space:nowrap;font-size:12px}.misD{color:#8395a7;font-size:11.5px;white-space:nowrap}
+  .misB{padding:2px 4px 10px 46px}.misB p{font-size:12.5px;line-height:1.45;color:#dfe6e9;margin:6px 0}
+  .misL{font-size:11.5px;color:#b2bec3;margin-bottom:8px}.misL p{font-size:11.5px;color:#b2bec3}
+  @media (max-width:600px){.misD{display:none}.misB{padding-left:4px}}
   .mis{background:#0f3460;border:1px solid #2d4a7a;border-radius:10px;padding:10px 12px;display:flex;flex-direction:column}
   .mis p{font-size:12.5px;line-height:1.45;color:#dfe6e9;margin:6px 0;flex:1}
   .mis details{font-size:11.5px;color:#b2bec3;margin-bottom:8px}.mis details p{font-size:11.5px;color:#b2bec3}
@@ -1131,7 +1146,7 @@ document.getElementById('peekBack').onclick = unpeek;
 document.getElementById('peekAct').onclick = () => { const id = peekInst; fui.openDetail(id); };
 document.getElementById('bAuf').onclick = () => bhf.oeffneAuftrag();
 document.getElementById('bBew').onclick = () => bhf.oeffneBewertung();
-initMissionen({ ui: fui, walk, wks, setExam: (on) => document.body.classList.toggle('exam', on) });
+initMissionen({ ui: fui, walk, wks, bhf, setExam: (on) => document.body.classList.toggle('exam', on) });
 const _exit = walk.exit;
 walk.exit = () => { unpeek(); _exit(); const b = document.getElementById('bWalk'); b.classList.remove('on'); b.textContent = '🚶 Begehen'; layout(); };
 
