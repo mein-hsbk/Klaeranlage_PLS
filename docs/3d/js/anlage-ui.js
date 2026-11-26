@@ -2,7 +2,7 @@
 // Instrument-Detailansicht, Protokoll, Meldung an die Schichtleitung, Hinweise (Toast).
 import { P, fmtZeit } from './faulung-modell.js';
 import { PB, STR, MODI } from './belueftung-modell.js';
-import { PP, KARTEN } from './pumpwerk-modell.js';
+import { PP, KARTEN, PEGEL_KARTE } from './pumpwerk-modell.js';
 import { PO } from './pwost-modell.js';
 import { sim, logA, logText } from './anlage-sim.js';
 import { insts, f1, f0 } from './instrumente.js';
@@ -103,7 +103,7 @@ export function initAnlageUI() {
       const W = sim.P, st = (x) => x.stoer ? 'Störung' : !x.rep ? 'Rep.-Sch. 0' : x.run ? 'Betrieb' : 'Bereit';
       const cl = (x) => (x.stoer || !x.rep ? 'a' : '');
       $('pwVals').innerHTML = `<table>
-        ${row('LI-001', 'Pegel Pumpensumpf', num(W.li, 2), 'm', W.li > 2.4 ? 'a' : '')}
+        ${row('LI-001', 'Pegel Pumpensumpf', W.lm.valid ? num(W.lm.liAnz, 2) : '----', 'm', !W.lm.valid || W.lm.liAnz > 2.4 ? 'a' : '')}
         ${row('FI-001', 'Förderstrom Druckleitung', f0(W.q), 'm³/h', W.p.some((x) => x.run && x.laeuftT > 120 && x.q < PP.Q_SOLL) ? 'w' : '')}
         ${row('', 'Ein- / Ausschaltpegel', `${num(W.liEin, 2)} / ${num(W.liAus, 2)}`, 'm')}
       </table><table style="margin-top:4px">
@@ -210,14 +210,14 @@ export function initAnlageUI() {
   // Diagnoseauswahl (nur in Pumpwerksmissionen): ui.diagnose = true, wenn die Mission eine Diagnose verlangt
   ui.diagnose = null;
   $('bMeld').onclick = () => {
-    const k = ui.diagnose && KARTEN[sim.P.karte], sel = $('meldDiag');
+    const k = ui.diagnose && (KARTEN[sim.P.karte] || (sim.P.karte === 'LM' && PEGEL_KARTE)), sel = $('meldDiag');
     $('meldDiagW').style.display = k ? '' : 'none';
     if (k) sel.innerHTML = '<option value="">– Ursache auswählen –</option>' + Object.entries(k.ursachen).map(([v, t]) => `<option value="${v}">${t}</option>`).join('') + '<option value="unklar">Ursache nicht eindeutig feststellbar</option>';
     $('meld').style.display = 'flex'; $('meldText').focus();
   };
   $('meldCancel').onclick = () => { $('meld').style.display = 'none'; };
   $('meldOk').onclick = () => {
-    const t = $('meldText').value.trim(), k = ui.diagnose && KARTEN[sim.P.karte], d = k ? $('meldDiag').value : '';
+    const t = $('meldText').value.trim(), k = ui.diagnose && (KARTEN[sim.P.karte] || (sim.P.karte === 'LM' && PEGEL_KARTE)), d = k ? $('meldDiag').value : '';
     if (k && !d) return ui.toast('Bitte die festgestellte Ursache auswählen.');
     if (d) { sim.diagnose = d; logA(`DIAGNOSE: ${d === 'unklar' ? 'Ursache nicht eindeutig feststellbar' : k.ursachen[d]}`, 'meldung'); }
     if (t) logA(`MELDUNG an Schichtleitung: ${t}`, 'meldung');

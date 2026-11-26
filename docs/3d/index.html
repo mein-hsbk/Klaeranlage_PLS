@@ -49,6 +49,7 @@
   body.walking #walkbar{display:block}
   #walkSt,#walkTools{display:flex;gap:6px;overflow-x:auto}
   #walkTools{margin-top:7px}
+  body:not(.mis-pegel) #bMp{display:none}
   #peekBar{position:fixed;left:50%;top:calc(env(safe-area-inset-top) + 60px);transform:translateX(-50%);display:none;gap:8px;align-items:center;background:#16213ef0;border:1px solid #ffd54a;color:#ffeaa7;border-radius:10px;padding:7px 10px;font-size:13px;z-index:5;max-width:94vw;flex-wrap:wrap;justify-content:center}
   #auf label,#bew label{display:block;margin:8px 0 4px;font-size:13px;color:#b2bec3}
   #walkSt .btn,#walkTools .btn{font-size:12px;padding:6px 9px}
@@ -221,6 +222,13 @@
   <label for="bewText">Begründung (Befunde vor Ort)</label><textarea id="bewText" style="width:100%;min-height:90px;font-size:16px;border-radius:6px;padding:8px;background:#0f3460;color:#fff;border:1px solid #2d4a7a;box-sizing:border-box"></textarea>
   <div style="display:flex;justify-content:flex-end;margin-top:10px"><button class="btn on" id="bewOk">Im Protokoll notieren</button></div>
 </div></div>
+<div class="ov" id="mp"><div class="card">
+  <div style="display:flex;align-items:flex-start;gap:8px"><div style="flex:1"><h2>Messprotokoll · Niveaumessung LI-001</h2><div class="sub">Abwasserpumpwerk Talstraße · Pegelsonde 0–5 mWS, 4–20 mA · Einbauhöhe 0,10 m über Sohle · Bezug OK Lukenrahmen 3,95 m über Sohle</div></div><button class="btn" id="mpClose" aria-label="Schließen">×</button></div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap"><div style="flex:1;min-width:140px"><label for="mpAb">Abstich ab OK Lukenrahmen [m]</label><input id="mpAb" inputmode="decimal" style="width:100%;box-sizing:border-box;font-size:16px;padding:7px;border-radius:6px;background:#0f3460;color:#fff;border:1px solid #2d4a7a"></div><div style="flex:1;min-width:140px"><label for="mpPeg">Pegel berechnet [m]</label><input id="mpPeg" inputmode="decimal" style="width:100%;box-sizing:border-box;font-size:16px;padding:7px;border-radius:6px;background:#0f3460;color:#fff;border:1px solid #2d4a7a"></div></div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap"><div style="flex:1;min-width:140px"><label for="mpAnz">Anzeige LI-001 [m]</label><input id="mpAnz" inputmode="decimal" style="width:100%;box-sizing:border-box;font-size:16px;padding:7px;border-radius:6px;background:#0f3460;color:#fff;border:1px solid #2d4a7a"></div><div style="flex:1;min-width:140px"><label for="mpIm">Schleifenstrom gemessen [mA]</label><input id="mpIm" inputmode="decimal" style="width:100%;box-sizing:border-box;font-size:16px;padding:7px;border-radius:6px;background:#0f3460;color:#fff;border:1px solid #2d4a7a"></div><div style="flex:1;min-width:140px"><label for="mpIs">Sollstrom berechnet [mA]</label><input id="mpIs" inputmode="decimal" style="width:100%;box-sizing:border-box;font-size:16px;padding:7px;border-radius:6px;background:#0f3460;color:#fff;border:1px solid #2d4a7a"></div></div>
+  <label for="mpBem">Bemerkung</label><input id="mpBem" style="width:100%;box-sizing:border-box;font-size:16px;padding:7px;border-radius:6px;background:#0f3460;color:#fff;border:1px solid #2d4a7a" placeholder="z. B. vor / nach Instandsetzung, Auffälligkeiten">
+  <div style="display:flex;justify-content:flex-end;margin-top:10px"><button class="btn on" id="mpOk">Protokoll abschließen</button></div>
+</div></div>
 <div class="ov" id="meld"><div class="card">
   <h2>Meldung an die Schichtleitung</h2>
   <div class="sub">Befund, vermutete Ursache, durchgeführte oder vorgeschlagene Maßnahme</div>
@@ -265,7 +273,7 @@
   </div>
   <div id="walkbar">
     <div id="walkSt"></div>
-    <div id="walkTools"><button class="btn" id="bMis2">🎯 Missionen</button><button class="btn" id="bAuf" style="display:none">📝 Auftrag</button><button class="btn" id="bBew" style="display:none">📊 Kapazität bewerten</button><button class="btn" id="bMeld">Meldung</button><button class="btn" id="bLog">Protokoll</button><span class="hint">W A S D gehen · Ziehen umsehen · E / Klick: Instrument · Tab: Leitwarte</span></div>
+    <div id="walkTools"><button class="btn" id="bMis2">🎯 Missionen</button><button class="btn" id="bAuf" style="display:none">📝 Auftrag</button><button class="btn" id="bBew" style="display:none">📊 Kapazität bewerten</button><button class="btn" id="bMp">📋 Messprotokoll</button><button class="btn" id="bMeld">Meldung</button><button class="btn" id="bLog">Protokoll</button><span class="hint">W A S D gehen · Ziehen umsehen · E / Klick: Instrument · Tab: Leitwarte</span></div>
   </div>
 </div>
 <div id="load">3D-Modell wird geladen …</div>
@@ -283,6 +291,7 @@ import { initWerkstatt } from './js/werkstatt.js';
 import { initMissionen } from './js/missionen.js';
 import { insts, instMeshes, updateInstruments } from './js/instrumente.js';
 import { createWalk } from './js/begehung.js';
+import { messprotokoll } from './js/pumpwerk-modell.js';
 import { simTick, sim, logA } from './js/anlage-sim.js';
 const fui = initAnlageUI();
 const wks = initWerkstatt(fui);
@@ -684,7 +693,7 @@ scene.add(bubbleMesh);
 
 // Gebläsestation, Luftverteilung, Sondenausleger (begehbar, mit Belüftungssimulation) → js/belueftung-szene.js
 const bel = buildBelueftung(scene, { box, cyl, reg, M, std }, { toast: (m) => fui.toast(m) });
-const pwt = buildPumpwerk(scene, { box, cyl, reg, M, std }, { toast: (m) => fui.toast(m), werkstatt: () => wks.open() });
+const pwt = buildPumpwerk(scene, { box, cyl, reg, M, std }, { toast: (m) => fui.toast(m), werkstatt: () => wks.open(), messprotokoll: () => mpOpen() });
 const bhf = buildBahnhof(scene, { box, reg, M, std }, { toast: (m) => fui.toast(m), openDetail: (id) => fui.openDetail(id), peek: (k) => peek(k) });
 bhf.initOverlays(fui);
 const pwo = buildOst(scene, { box, cyl, reg, M, std }, { toast: (m) => fui.toast(m) });
@@ -1155,6 +1164,17 @@ document.getElementById('peekBack').onclick = unpeek;
 document.getElementById('peekAct').onclick = () => { const id = peekInst; fui.openDetail(id); };
 document.getElementById('bAuf').onclick = () => bhf.oeffneAuftrag();
 document.getElementById('bBew').onclick = () => bhf.oeffneBewertung();
+// Messprotokoll LI-001 (Mission Pegelmessung)
+const MP = ['mpAb', 'mpPeg', 'mpAnz', 'mpIm', 'mpIs', 'mpBem'];
+function mpOpen() { MP.forEach((i) => { document.getElementById(i).value = ''; }); document.getElementById('mp').style.display = 'flex'; if (document.pointerLockElement) document.exitPointerLock(); }
+fui.overlays.push('mp');
+document.getElementById('bMp').onclick = mpOpen;
+document.getElementById('mpClose').onclick = () => { document.getElementById('mp').style.display = 'none'; };
+document.getElementById('mpOk').onclick = () => {
+  const v = (i) => document.getElementById(i).value.trim();
+  messprotokoll(sim.P, { abstich: v('mpAb'), pegel: v('mpPeg'), anz: v('mpAnz'), iMess: v('mpIm'), iSoll: v('mpIs'), bem: v('mpBem') }, logA);
+  document.getElementById('mp').style.display = 'none'; fui.toast('Messprotokoll im Protokoll abgelegt');
+};
 initMissionen({ ui: fui, walk, wks, bhf, setExam: (on) => document.body.classList.toggle('exam', on) });
 const _exit = walk.exit;
 walk.exit = () => { unpeek(); _exit(); const b = document.getElementById('bWalk'); b.classList.remove('on'); b.textContent = '🚶 Begehen'; layout(); };

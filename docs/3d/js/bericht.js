@@ -28,7 +28,7 @@ export function sammleBericht(m, ctx) {
   };
 }
 function lastS() { const S = sim.S; return { lvl: S.V / 6, q: S.qProd, pel: S.pel, T: S.T_ft, ch4: S.ch4, f: S.fackel ? 1 : 0 }; }
-function lastP() { const P = sim.P; return { li: P.li, q: P.q, q1: P.p[0].q, q2: P.p[1].q, i1: P.p[0].amp, i2: P.p[1].amp, v1: P.p[0].v, vor: P.p[0].vorlage }; }
+function lastP() { const P = sim.P; return { li: P.lm && !P.lm.valid ? 0 : (P.lm ? P.lm.liAnz : P.li), lw: P.li, q: P.q, q1: P.p[0].q, q2: P.p[1].q, i1: P.p[0].amp, i2: P.p[1].amp, v1: P.p[0].v, vor: P.p[0].vorlage }; }
 function lastO() { const O = sim.O; return { li: O.li, q: O.q, q1: O.p[0].q, q2: O.p[1].q, f1: O.p[0].f, i1: O.p[0].amp, i2: O.p[1].amp, qin: O.qIn }; }
 function lastB() { const B = sim.B; return { m1: B.s[0].meas, m2: B.s[1].meas, o1: B.s[0].o2, o2: B.s[1].o2, l1: B.s[0].L, l2: B.s[1].L, p: B.pkw, pr: B.pref, nh4: B.nh4 }; }
 
