@@ -93,9 +93,9 @@ export function buildFaulung(scene, h, hooks = {}) {
     pipe(g, [[33.4, 2.6, 57.2], [31.3, 2.6, 57.2], [31.3, 0.75, 57.2], [30.76, 0.75, 57.2]], 0.1, std(0xc0392b, { r: 0.5, m: 0.1 }));
     pipe(g, [[30.6, 0.99, 57.2], [30.6, 1.9, 57.2], [30.6, 1.9, 60.38]], 0.1, std(0xc0392b, { r: 0.5, m: 0.1 }));
     pipe(g, [[23.6, 1.35, 60.6], [23.2, 1.35, 60.6], [23.2, 2.2, 60.6], [23.2, 2.2, 56.2], [33.4, 2.2, 56.2]], 0.1, std(0x2e86de, { r: 0.5, m: 0.1 }));
-    makeInst('p111', { name: 'Heizwasser-Umwälzpumpe Faulturm', tag: 'P11.1', pos: [29.6, 1.08, 57.2], size: 0.32, aspect: 0.35, res: 128,
+    makeInst('p111', { name: 'Heizwasser-Umwälzpumpe Faulturm', tag: 'P11.1', pos: [29.6, 1.08, 57.2], size: 0.32, aspect: 0.35, res: 256,
       info: 'Umwälzpumpe im Heizwasserkreis vom BHKW bzw. Heizkessel zum Schlammwärmetauscher W10.1. Ohne Umwälzung wird der Faulturm nicht beheizt.',
-      draw: plate('P11.1'),
+      draw: plate('P11.1\nHeizwasserpumpe'),
       detail: (ctx, W, Hc) => senses(ctx, W, Hc, 'Heizwasserpumpe P11.1', sim.S.p11 ? ['Motor brummt gleichmäßig,', 'Kupplung dreht sich,', 'Pumpengehäuse warm.'] : ['Motor steht, kein Geräusch.', 'Kupplung steht still.', 'Pumpengehäuse lauwarm.'], sim.S.p11) });
     makeInst('ti1101', { name: 'Thermometer Heizwasser-Vorlauf', tag: 'TI 1101', pos: [30.6, 1.45, 57.34], size: 0.24, round: true,
       info: 'Zeigerthermometer im Heizwasser-Vorlauf zum Schlammwärmetauscher W10.1.',
@@ -179,9 +179,9 @@ export function buildFaulung(scene, h, hooks = {}) {
     anim.valve = new THREE.Group(); anim.valve.position.set(cx, 1.36, 46.0); g.add(anim.valve);
     { const hb = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.05, 0.62), M.gas); hb.position.set(0, 0, 0.27); hb.castShadow = true; anim.valve.add(hb);
       const hs = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.16, 8), M.steelDark); hs.position.y = -0.08; anim.valve.add(hs); noCol(anim.valve); }
-    makeInst('ha611', { name: 'Kugelhahn Gaszuleitung Verdichter', tag: 'HA 611', pos: [cx + 0.45, 1.2, 46.0], rotY: Math.PI / 2, size: 0.22, aspect: 0.5, res: 128,
+    makeInst('ha611', { name: 'Kugelhahn Gaszuleitung Verdichter', tag: 'HA 611', pos: [cx + 0.45, 1.2, 46.0], rotY: Math.PI / 2, size: 0.22, aspect: 0.5, res: 256,
       info: 'Handbetätigter Kugelhahn (Viertelumdrehung) in der Gasleitung vom Gasspeicher zum Gasverdichter V6.1. Der gelbe Hebel zeigt die Stellung der Kugel an.',
-      draw: plate('HA 611', '#f1c40f'),
+      draw: plate('HA 611\nKugelhahn Gas', '#f1c40f'),
       detail: (ctx, W, Hc) => {
         ctx.fillStyle = '#c8d0d4'; ctx.fillRect(0, 0, W, Hc);
         ctx.fillStyle = '#f1c40f'; ctx.fillRect(0, Hc * 0.42, W, Hc * 0.16); ctx.fillStyle = '#e1b40e'; ctx.fillRect(0, Hc * 0.42, W, Hc * 0.04);
@@ -204,9 +204,9 @@ export function buildFaulung(scene, h, hooks = {}) {
     makeInst('pi613', { name: 'Manometer Gasdruck nach Verdichter', tag: 'PI 613', pos: [cx - 0.18, 1.48, 34.0], rotY: Math.PI / 2, size: 0.26, round: true,
       info: 'Manometer auf der Druckseite des Gasverdichters V6.1 (Gaszuführung BHKW). Daneben liegt der Druckschalter PSL 613 der BHKW-Gasregelstrecke.',
       draw: (ctx, W) => gauge(ctx, W, { min: 0, max: 150, ticks: 6, unit: 'mbar', tag: 'PI 613', val: sim.S.p613 + noise(sim.S.verd ? 1.2 : 0.1, 3) }) });
-    makeInst('v61', { name: 'Gasverdichter (Seitenkanalverdichter)', tag: 'V6.1', pos: [cx - 0.04, 0.55, 36.95], rotY: Math.PI / 2, size: 0.4, aspect: 0.4, res: 128,
+    makeInst('v61', { name: 'Gasverdichter (Seitenkanalverdichter)', tag: 'V6.1', pos: [cx - 0.04, 0.55, 36.95], rotY: Math.PI / 2, size: 0.4, aspect: 0.4, res: 256,
       info: 'Seitenkanalverdichter: erhöht den Gasdruck vom Speicherniveau auf den Vordruck der BHKW-Gasregelstrecke. Er läuft, wenn das BHKW startet oder in Betrieb ist.',
-      draw: plate('V6.1'),
+      draw: plate('V6.1\nGasverdichter'),
       detail: (ctx, W, Hc) => senses(ctx, W, Hc, 'Gasverdichter V6.1', sim.S.verd ? ['Motor läuft, gleichmäßiges Pfeifen', 'des Seitenkanalverdichters,', 'Lüfterrad dreht sich.'] : ['Motor steht. Kein Geräusch,', 'Lüfterrad steht still.'], sim.S.verd) });
     // Fackelleitung GS-1 → F6.1
     pipe(g, [[78.5, 0.7, cz], [79.2, 1.1, cz], [96, 1.1, cz], [96, 1.1, 67.8], [97.3, 0.6, 69.4]], 0.14, M.gas);

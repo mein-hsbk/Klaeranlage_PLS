@@ -43,17 +43,32 @@ export function lamp(ctx, x, y, r, col, on, label, W) {
   if (on) { ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.beginPath(); ctx.arc(x - r * 0.3, y - r * 0.3, r * 0.35, 0, 7); ctx.fill(); }
   ctx.fillStyle = '#2d3436'; ctx.font = `${W * 0.045}px Arial`; ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillText(label, x, y + r * 1.5);
 }
+// Schild: erste Zeile groß (z. B. Bezeichnung), weitere Zeilen kleiner; Schrift passt sich der Breite an
 export function plate(text, bg = '#ecf0f1') {
-  return (ctx, W, H) => { ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H); ctx.fillStyle = '#111'; ctx.font = `bold ${W * 0.2}px Arial`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(text, W / 2, H / 2); };
+  return (ctx, W, H) => {
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H); ctx.strokeStyle = '#111'; ctx.lineWidth = Math.max(2, W * 0.015); ctx.strokeRect(ctx.lineWidth / 2, ctx.lineWidth / 2, W - ctx.lineWidth, H - ctx.lineWidth);
+    const z = String(text).split('\n'), gross = [0.2, 0.13, 0.11];
+    const groesse = z.map((t, i) => { let f = W * (gross[i] || 0.11); ctx.font = `${i ? '' : 'bold '}${f}px Arial`; const w = ctx.measureText(t).width; if (w > W * 0.88) f *= (W * 0.88) / w; return Math.min(f, H * (z.length > 1 ? 0.36 : 0.6)); });
+    const hoehe = groesse.reduce((a, f) => a + f * 1.15, 0); let y = (H - hoehe) / 2;
+    ctx.fillStyle = '#111'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    z.forEach((t, i) => { ctx.font = `${i ? '' : 'bold '}${groesse[i]}px Arial`; ctx.fillText(t, W / 2, y + groesse[i] * 0.07); y += groesse[i] * 1.15; });
+  };
 }
 // Textuelle Sinneswahrnehmung (Geräusch, Vibration, Wärme)
 export function senses(ctx, W, H, title, lines, on) {
   ctx.fillStyle = '#1e272e'; ctx.fillRect(0, 0, W, H);
   ctx.fillStyle = on ? '#00b894' : '#636e72'; ctx.beginPath(); ctx.arc(W * 0.12, H * 0.16, W * 0.04, 0, 7); ctx.fill();
-  ctx.fillStyle = '#ffeaa7'; ctx.font = `bold ${W * 0.06}px Arial`; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(title, W * 0.2, H * 0.16);
-  ctx.fillStyle = '#dfe6e9'; ctx.font = `${W * 0.052}px Arial`;
-  ctx.fillText('Sinneseindruck vor Ort:', W * 0.08, H * 0.34);
-  lines.forEach((l, i) => ctx.fillText(l, W * 0.08, H * 0.48 + i * H * 0.11));
+  ctx.fillStyle = '#ffeaa7'; ctx.font = `bold ${W * 0.06}px Arial`; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(title, W * 0.2, H * 0.16, W * 0.76);
+  // Zeilen umbrechen, damit nichts rechts abgeschnitten wird; bei viel Text kleiner schreiben
+  const breite = W * 0.86;
+  const umbruch = (f) => { ctx.font = `${f}px Arial`; const out = []; for (const l of lines) { let z = ''; for (const w of String(l).split(' ')) { const t = z ? z + ' ' + w : w; if (ctx.measureText(t).width > breite && z) { out.push(z); z = w; } else z = t; } out.push(z); } return out; };
+  let f = W * 0.052, zl = umbruch(f);
+  const platz = () => H * 0.88 - H * 0.42;
+  while (f > W * 0.03 && zl.length * f * 1.3 > platz()) { f *= 0.92; zl = umbruch(f); }
+  ctx.fillStyle = '#dfe6e9'; ctx.font = `${W * 0.048}px Arial`;
+  ctx.fillText('Sinneseindruck vor Ort:', W * 0.08, H * 0.32);
+  ctx.font = `${f}px Arial`;
+  zl.forEach((l, i) => ctx.fillText(l, W * 0.08, H * 0.42 + f * 0.6 + i * f * 1.3));
 }
 
 // Registry: alle Instrumente der Szene (Faulung, Belüftung, …)

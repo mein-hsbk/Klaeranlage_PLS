@@ -241,9 +241,9 @@ export function buildOst(scene, h, hooks = {}) {
 
   // Pumpensumpf: Blick durch die Einstiegsluke
   noCol(box(g, 0.06, 1.1, 0.06, M.galv, 202.5, 0.55, 15.35, 0, false));
-  makeInst('po_sumpf', { name: 'Pumpensumpf APW-02 (Blick durch die Einstiegsluke)', tag: 'Pumpensumpf', pos: [202.5, 1.55, 15.3], rotY: Math.PI, size: 0.4, aspect: 0.5, res: 128,
+  makeInst('po_sumpf', { name: 'Pumpensumpf APW-02 (Blick durch die Einstiegsluke)', tag: 'Pumpensumpf', pos: [202.5, 1.55, 15.3], rotY: Math.PI, size: 0.4, aspect: 0.5, res: 256,
     info: 'Nassschacht mit Zulauf aus dem Gewerbegebiet (Mischwasser) und den Saugrohren der beiden Pumpen. Bei hohem Pegel staut das Abwasser in den Zulaufkanal zurück.',
-    draw: plate('Pumpensumpf', '#f6e58d'),
+    draw: plate('Pumpensumpf\nEinstiegsluke', '#f6e58d'),
     detail: (ctx, W, Hc) => {
       const pw = P(), run = pw.p.some((x) => x.run);
       senses(ctx, W, Hc, 'Pumpensumpf', [`Wasserstand ca. ${f1(pw.li)} m über der Sohle${pw.li > PO.LI_HOCH ? ' – Zulaufkanal eingestaut!' : ''}.`,

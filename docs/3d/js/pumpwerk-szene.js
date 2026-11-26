@@ -243,11 +243,11 @@ export function buildPumpwerk(scene, h, hooks = {}) {
       { typ: 'titel', label: 'Niveaumessung LI-001' },
       { typ: 'wahl', label: 'Niveausteuerung', wert: P().lm.modus, optionen: [['sonde', 'Sonde LI-001'], ['schwimmer', 'Schwimmer-Notbetrieb']], fn: (v) => { const m = setNiveauModus(P(), v, logA); if (m) toast(m); } },
       { typ: 'zahl', label: 'Messbereichsendwert LI-001 (Anfang 0 m ≙ 4 mA)', wert: +P().lm.mbPar.toFixed(2), min: 1, max: 10, einheit: 'm', fn: (v) => setMessbereich(P(), v, logA) },
-      ...(hooks.messprotokoll ? [{ label: 'Messprotokoll LI-001 ausfüllen', fn: () => setTimeout(hooks.messprotokoll, 0) }] : []),
+      ...(hooks.messprotokoll ? [{ label: 'Messprotokoll LI-001 öffnen', fn: () => setTimeout(hooks.messprotokoll, 0) }] : []),
     ] });
-  makeInst('pw_tv', { name: 'Trennverstärker LI-001 (Hutschiene im Schaltschrank)', tag: 'Trennverstärker LI-001', pos: [-182.66, 0.72, 72.25], rotY: -Math.PI / 2, size: 0.2, aspect: 0.8, res: 128,
+  makeInst('pw_tv', { name: 'Trennverstärker LI-001 (Hutschiene im Schaltschrank)', tag: 'Trennverstärker LI-001', pos: [-182.66, 0.72, 72.25], rotY: -Math.PI / 2, size: 0.2, aspect: 0.8, res: 256,
     info: 'Galvanische Trennung des 4–20-mA-Signals zwischen Feld (Pegelsonde, Speisung 24 V) und Analogeingang der Steuerung. Messbuchsen für Eingang und Ausgang an der Front – Strom messen ohne den Kreis aufzutrennen. Ersatzgerät liegt im Schrank.',
-    draw: (ctx, W, Hc) => { ctx.fillStyle = '#ecf0f1'; ctx.fillRect(0, 0, W, Hc); ctx.fillStyle = '#2d3436'; ctx.fillRect(W * 0.3, Hc * 0.08, W * 0.4, Hc * 0.84); ctx.fillStyle = '#fff'; ctx.font = `bold ${W * 0.09}px Arial`; ctx.textAlign = 'center'; ctx.fillText('LI-001', W / 2, Hc * 0.3); lamp(ctx, W * 0.5, Hc * 0.62, W * 0.05, '#00b894', true, '', W); },
+    draw: (ctx, W, Hc) => { ctx.fillStyle = '#ecf0f1'; ctx.fillRect(0, 0, W, Hc); ctx.fillStyle = '#2d3436'; ctx.fillRect(W * 0.3, Hc * 0.08, W * 0.4, Hc * 0.84); ctx.fillStyle = '#fff'; ctx.font = `bold ${W * 0.085}px Arial`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('LI-001', W / 2, Hc * 0.22); ctx.font = `${W * 0.055}px Arial`; ctx.fillText('Trenn-', W / 2, Hc * 0.36); ctx.fillText('verstärker', W / 2, Hc * 0.44); lamp(ctx, W * 0.5, Hc * 0.6, W * 0.04, '#00b894', true, '', W); ctx.fillStyle = '#dfe6e9'; ctx.font = `${W * 0.045}px Arial`; ctx.textBaseline = 'middle'; ctx.fillText('IN ◉  OUT ◉', W / 2, Hc * 0.8); },
     actions: () => [
       { label: 'Strom am Eingang messen (Feldseite)', fn: () => toast(tvMessen(P(), 'ein', logA)) },
       { label: 'Strom am Ausgang messen (zur Steuerung)', fn: () => toast(tvMessen(P(), 'aus', logA)) },
@@ -256,9 +256,9 @@ export function buildPumpwerk(scene, h, hooks = {}) {
 
   // Pumpensumpf: Blick durch die Einstiegsluke
   noCol(box(g, 0.06, 1.1, 0.06, M.galv, -201.5, 0.55, 67.35, 0, false));
-  makeInst('pw_sumpf', { name: 'Pumpensumpf (Blick durch die Einstiegsluke)', tag: 'Pumpensumpf', pos: [-201.5, 1.55, 67.3], rotY: Math.PI, size: 0.4, aspect: 0.5, res: 128,
+  makeInst('pw_sumpf', { name: 'Pumpensumpf (Blick durch die Einstiegsluke)', tag: 'Pumpensumpf', pos: [-201.5, 1.55, 67.3], rotY: Math.PI, size: 0.4, aspect: 0.5, res: 256,
     info: 'Nassschacht mit Zulauf aus dem Kanalnetz und den Saugrohren der beiden Pumpen. Fällt der Wasserstand zu tief über den Saugrohren, bilden sich Hohlwirbel, die Luft in die Pumpe ziehen.',
-    draw: plate('Pumpensumpf', '#f6e58d'),
+    draw: plate('Pumpensumpf\nEinstiegsluke', '#f6e58d'),
     detail: (ctx, W, Hc) => {
       const pw = P(), run = pw.p.some((x) => x.run), luft = pw.p.some((x) => x.luft);
       senses(ctx, W, Hc, 'Pumpensumpf', [`Wasserstand ca. ${f1(pw.li)} m über der Sohle${pw.li > 2.4 ? ' – sehr hoch!' : ''}.`,
@@ -274,9 +274,9 @@ export function buildPumpwerk(scene, h, hooks = {}) {
       { label: 'S3 Hochwasser (2,50 m) prüfen', fn: () => toast(schwimmerPruefen(P(), 3, logA)) },
       { label: 'Verhakten Schwimmer freimachen', fn: () => toast(schwimmerFrei(P(), logA)) },
     ] });
-  makeInst('pw_kk', { name: 'Klemmenkasten LI-001 am Pumpensumpf', tag: 'Klemmenkasten LI-001', pos: [-200.5, 1.14, 67.27], rotY: Math.PI, size: 0.3, aspect: 1.15, res: 128,
+  makeInst('pw_kk', { name: 'Klemmenkasten LI-001 am Pumpensumpf', tag: 'Klemmenkasten LI-001', pos: [-200.5, 1.14, 67.27], rotY: Math.PI, size: 0.3, aspect: 1.15, res: 256,
     info: 'Übergang vom Sondenkabel (mit Druckausgleichskapillare) auf das Feldkabel zum Schaltschrank. Trennklemmen mit Prüfbuchse: Schleifenstrom messen ohne Auftrennen. Kleinspannung 24 V DC.',
-    draw: (ctx, W, Hc) => { const L = P().lm; ctx.fillStyle = L.kkOffen ? '#636e72' : '#b2bec3'; ctx.fillRect(0, 0, W, Hc); ctx.fillStyle = '#111'; ctx.font = `bold ${W * 0.13}px Arial`; ctx.textAlign = 'center'; ctx.fillText('LI-001', W / 2, Hc * 0.3); ctx.font = `${W * 0.1}px Arial`; ctx.fillText(L.kkOffen ? 'offen' : '24 V DC', W / 2, Hc * 0.55); },
+    draw: (ctx, W, Hc) => { const L = P().lm; ctx.fillStyle = L.kkOffen ? '#636e72' : '#b2bec3'; ctx.fillRect(0, 0, W, Hc); ctx.fillStyle = '#111'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = `bold ${W * 0.1}px Arial`; ctx.fillText('Klemmenkasten', W / 2, Hc * 0.2, W * 0.9); ctx.font = `bold ${W * 0.14}px Arial`; ctx.fillText('LI-001', W / 2, Hc * 0.38); ctx.font = `${W * 0.085}px Arial`; ctx.fillText('Pegelsonde', W / 2, Hc * 0.55); ctx.fillText(L.kkOffen ? 'geöffnet' : '24 V DC', W / 2, Hc * 0.72); },
     detail: (ctx, W, Hc) => { const L = P().lm; senses(ctx, W, Hc, 'Klemmenkasten LI-001', L.kkOffen ? ['Klemmleiste X1: 1 (+) / 2 (–) Sonde, 3 / 4 Feldkabel, Trennklemmen mit Prüfbuchse.', 'Kabelfahne Sonde: hydrostatisch 0–0,5 bar rel. ≙ 0–5 mWS,', '4–20 mA Zweileiter, Einbau 0,10 m über Sohle.'] : ['Gehäuse geschlossen, vier Schrauben.', 'Prüfbuchse der Trennklemme von außen zugänglich.'], true); },
     actions: () => { const L = P().lm; return [
       { label: L.kkOffen ? 'Klemmenkasten schließen' : 'Klemmenkasten öffnen', fn: () => kkOeffnen(P(), !L.kkOffen, logA) },
@@ -289,9 +289,9 @@ export function buildPumpwerk(scene, h, hooks = {}) {
       { label: 'Ader neu auflegen (abisolieren, Aderendhülse)', fn: () => toast(aderAuflegen(P(), logA)) },
       { label: 'Trocknen, Dichtung und Kabelverschraubung erneuern', fn: () => toast(kkTrocknen(P(), logA)) },
     ]; } });
-  makeInst('pw_lis', { name: 'Pegelsonde LI-001 (Kabelabfangung an der Luke)', tag: 'Pegelsonde LI-001', pos: [-201.9, 0.78, 67.58], rotY: Math.PI, size: 0.16, aspect: 0.7, res: 128,
+  makeInst('pw_lis', { name: 'Pegelsonde LI-001 (Kabelabfangung an der Luke)', tag: 'Pegelsonde LI-001', pos: [-201.9, 0.78, 67.58], rotY: Math.PI, size: 0.2, aspect: 0.6, res: 256,
     info: 'Hydrostatische Pegelsonde: misst den Wasserdruck über der Membran (1 m Wassersäule ≈ 0,1 bar). Das Kabel enthält eine Kapillare zum Ausgleich des Luftdrucks. Einbauhöhe über Sohle durch eine Markierung am Kabel an der Halteklemme festgelegt.',
-    draw: plate('LI-001', '#d6e4f0'),
+    draw: plate('Pegelsonde\nLI-001', '#d6e4f0'),
     actions: () => { const L = P().lm; return [
       { label: L.sondeOut ? 'Sonde einhängen (Markierung an die Halteklemme)' : 'Sonde ziehen', fn: () => sondeZiehen(P(), !L.sondeOut, logA) },
       { label: 'Sonde und Kabel begutachten', fn: () => toast(sondeBegutachten(P(), logA)) },
