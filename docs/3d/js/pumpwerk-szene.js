@@ -2,7 +2,7 @@
 // KSB Sewatec E 100-317 mit Saug-/Druckschieber, Rückschlagklappe, Manometern, Vorlagebehälter der
 // Tandem-Gleitringdichtung, Vor-Ort-Schaltkasten (Wahlschalter, Reparaturschalter) und Pumpensteuerung.
 import * as THREE from 'three';
-import { PP, ausbauen, setWahl, setRep, setSchloss, setSchieber, setAblass, quittieren, setAusPegel, setEinPegel, stopfenNachziehen, vorlageNachfuellen, messung, pumpeName } from './pumpwerk-modell.js';
+import { PP, LI, PEGEL_KARTE, abstich, schwimmerPruefen, schwimmerFrei, sondeZiehen, sondeBegutachten, sondeReinigen, sondeTauschen, kkOeffnen, kkSicht, kkMessen, aderAuflegen, kkTrocknen, tvMessen, tvTauschen, setNiveauModus, setMessbereich, ausbauen, setWahl, setRep, setSchloss, setSchieber, setAblass, quittieren, setAusPegel, setEinPegel, stopfenNachziehen, vorlageNachfuellen, messung, pumpeName } from './pumpwerk-modell.js';
 import { sim, logA } from './anlage-sim.js';
 import { f1, f0, noise, gauge, lcd, lamp, plate, senses, makeInstFactory, pipeFactory } from './instrumente.js';
 
@@ -43,7 +43,9 @@ export function buildPumpwerk(scene, h, hooks = {}) {
     // Pumpensumpf (Nassschacht) westlich, abgedeckt, mit Einstiegsluke
     box(g, 7, 0.55, Z1 - Z0, M.concrete, -201.5, 0, (Z0 + Z1) / 2);
     noCol(box(g, 1.2, 0.06, 1.2, M.grating, -201.5, 0.55, 68.2, 0, false));
-    noCol(box(g, 0.25, 0.25, 0.25, std(0x2c3e50), -202.6, 0.55, 72.5, 0, false));             // LI-001 Ultraschallsensor
+    noCol(box(g, 0.06, 0.9, 0.06, M.galv, -200.5, 0.55, 67.42, 0, false));                     // Pfosten Klemmenkasten LI-001
+    noCol(box(g, 0.32, 0.38, 0.14, std(0x95a5a6, { r: 0.6 }), -200.5, 0.95, 67.35, 0, false));
+    noCol(box(g, 0.12, 0.08, 0.06, std(0x2c3e50), -201.9, 0.61, 67.62, 0, false));             // Kabelabfangung Pegelsonde
     pipe(g, [[-204.6, 0.2, 73.5], [-207, 0.2, 73.5], [-207, -0.4, 76]], 0.2, M.concreteDark); // Notüberlauf
   }
 
@@ -217,9 +219,10 @@ export function buildPumpwerk(scene, h, hooks = {}) {
     info: 'Niveausteuerung der Pumpen nach dem Pegel im Pumpensumpf (LI-001): Führungspumpe P-001 ein bei Einschaltpegel, aus bei Ausschaltpegel. P-002 übernimmt, wenn P-001 nicht in AUTO oder gestört ist, und läuft bei Pegel > 2,30 m zusätzlich. Ab 2,80 m springt der Notüberlauf an.',
     draw: (ctx, W, Hc) => {
       const pw = P(), z = (i) => { const x = pw.p[i]; return `${pumpeName(i)} ${WAHL[x.wahl].padEnd(4)} ${x.stoer ? 'STÖRUNG' : !x.rep ? 'Rep.-Sch.0' : x.run ? `Betrieb ${f0(x.amp)} A` : 'bereit'}`; };
-      lcd(ctx, W, Hc, 'Pumpensteuerung PW Talstraße', [`LI-001 Pegel   ${n2(pw.li)} m`, `FI-001        ${f0(pw.q)} m³/h`, `Ein ${n2(pw.liEin)} m  Aus ${n2(pw.liAus)} m`, z(0), z(1), `Zulauf ca.    ${f0(pw.qIn)} m³/h`], { lcdH: 0.62, fs: 0.058 });
+      const L = pw.lm, la = L.valid ? `${n2(L.liAnz)} m` : '---- (gestört)';
+      lcd(ctx, W, Hc, 'Pumpensteuerung PW Talstraße', [`LI-001 Pegel   ${la}`, `FI-001        ${f0(pw.q)} m³/h`, `Ein ${n2(pw.liEin)} m  Aus ${n2(pw.liAus)} m`, z(0), z(1), `Zulauf ca.    ${f0(pw.qIn)} m³/h`], { lcdH: 0.62, fs: 0.058 });
       lamp(ctx, W * 0.2, Hc * 0.87, W * 0.035, '#d63031', pw.p.some((x) => x.stoer), 'Störung', W);
-      lamp(ctx, W * 0.45, Hc * 0.87, W * 0.035, '#f1c40f', pw.li > 2.4, 'Pegel hoch', W);
+      lamp(ctx, W * 0.45, Hc * 0.87, W * 0.035, '#f1c40f', (L.valid && L.liAnz > 2.4) || L.s3, 'Pegel hoch', W);
       lamp(ctx, W * 0.72, Hc * 0.87, W * 0.035, '#d63031', pw.qUeb > 0, 'Notüberlauf', W);
     },
     detail: (ctx, W, Hc) => {
@@ -227,7 +230,7 @@ export function buildPumpwerk(scene, h, hooks = {}) {
       ctx.fillStyle = '#0d2310'; ctx.fillRect(W * 0.03, Hc * 0.03, W * 0.94, Hc * 0.42);
       ctx.fillStyle = '#7CFC9a'; ctx.font = `${W * 0.031}px monospace`; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
       const z = (i) => { const x = pw.p[i]; return `${pumpeName(i)} ${WAHL[x.wahl].padEnd(4)} ${(x.stoer ? 'STÖRUNG' : !x.rep ? 'Rep.-Sch.0' : x.run ? 'Betrieb' : 'bereit').padEnd(10)}${f1(x.amp).padStart(5)} A Bh ${f0(x.bh)} St ${x.starts}`; };
-      [`LI-001 Pegel ${n2(pw.li)} m   FI-001 ${f0(pw.q)} m³/h`, `Ein ${n2(pw.liEin)} m   Aus ${n2(pw.liAus)} m`, z(0), z(1), `Notüberlauf seit Start ${f0(pw.vUeb)} m³`].forEach((t, k) => ctx.fillText(t, W * 0.05, Hc * (0.06 + k * 0.075)));
+      [`LI-001 Pegel ${pw.lm.valid ? n2(pw.lm.liAnz) + ' m' : '---- '}  FI-001 ${f0(pw.q)} m³/h`, `Ein ${n2(pw.liEin)} m  Aus ${n2(pw.liAus)} m  ${pw.lm.modus === 'sonde' ? 'Sondenbetrieb' : 'NOTBETRIEB Schwimmer'}`, `LI-001 0–${n2(pw.lm.mbPar)} m (4–20 mA), Einbau +0,10 m  S1 ${pw.lm.s1 ? '●' : '○'} S2 ${pw.lm.s2 ? '●' : '○'} S3 ${pw.lm.s3 ? '●' : '○'}`, z(0), z(1), `Notüberlauf seit Start ${f0(pw.vUeb)} m³`].forEach((t, k) => ctx.fillText(t, W * 0.05, Hc * (0.06 + k * 0.075)));
       ctx.fillStyle = '#ffeaa7'; ctx.font = `bold ${W * 0.034}px Arial`; ctx.fillText('Störungsspeicher', W * 0.05, Hc * 0.49);
       ctx.fillStyle = '#dfe6e9'; ctx.font = `${W * 0.029}px Arial`;
       const al = Object.values(pw.alarme).filter((a) => a.klasse !== 'M').sort((a, b) => b.kommt - a.kommt).slice(0, 4).map((a) => `${a.aktiv ? '● ' : '○ '}${a.text.replace('PW Talstr.: ', '')}`);
@@ -237,6 +240,18 @@ export function buildPumpwerk(scene, h, hooks = {}) {
     actions: () => [
       { typ: 'zahl', label: 'Einschaltpegel', wert: +P().liEin.toFixed(2), min: 1.0, max: 2.4, einheit: 'm', fn: (v) => setEinPegel(P(), v, logA) },
       { typ: 'zahl', label: 'Ausschaltpegel', wert: +P().liAus.toFixed(2), min: 0.2, max: 1.4, einheit: 'm', fn: (v) => setAusPegel(P(), v, logA) },
+      { typ: 'titel', label: 'Niveaumessung LI-001' },
+      { typ: 'wahl', label: 'Niveausteuerung', wert: P().lm.modus, optionen: [['sonde', 'Sonde LI-001'], ['schwimmer', 'Schwimmer-Notbetrieb']], fn: (v) => { const m = setNiveauModus(P(), v, logA); if (m) toast(m); } },
+      { typ: 'zahl', label: 'Messbereichsendwert LI-001 (Anfang 0 m ≙ 4 mA)', wert: +P().lm.mbPar.toFixed(2), min: 1, max: 10, einheit: 'm', fn: (v) => setMessbereich(P(), v, logA) },
+      ...(hooks.messprotokoll ? [{ label: 'Messprotokoll LI-001 ausfüllen', fn: () => setTimeout(hooks.messprotokoll, 0) }] : []),
+    ] });
+  makeInst('pw_tv', { name: 'Trennverstärker LI-001 (Hutschiene im Schaltschrank)', tag: 'Trennverstärker LI-001', pos: [-182.66, 0.72, 72.25], rotY: -Math.PI / 2, size: 0.2, aspect: 0.8, res: 128,
+    info: 'Galvanische Trennung des 4–20-mA-Signals zwischen Feld (Pegelsonde, Speisung 24 V) und Analogeingang der Steuerung. Messbuchsen für Eingang und Ausgang an der Front – Strom messen ohne den Kreis aufzutrennen. Ersatzgerät liegt im Schrank.',
+    draw: (ctx, W, Hc) => { ctx.fillStyle = '#ecf0f1'; ctx.fillRect(0, 0, W, Hc); ctx.fillStyle = '#2d3436'; ctx.fillRect(W * 0.3, Hc * 0.08, W * 0.4, Hc * 0.84); ctx.fillStyle = '#fff'; ctx.font = `bold ${W * 0.09}px Arial`; ctx.textAlign = 'center'; ctx.fillText('LI-001', W / 2, Hc * 0.3); lamp(ctx, W * 0.5, Hc * 0.62, W * 0.05, '#00b894', true, '', W); },
+    actions: () => [
+      { label: 'Strom am Eingang messen (Feldseite)', fn: () => toast(tvMessen(P(), 'ein', logA)) },
+      { label: 'Strom am Ausgang messen (zur Steuerung)', fn: () => toast(tvMessen(P(), 'aus', logA)) },
+      { label: 'Trennverstärker gegen Ersatzgerät tauschen', fn: () => toast(tvTauschen(P(), logA)) },
     ] });
 
   // Pumpensumpf: Blick durch die Einstiegsluke
@@ -249,8 +264,40 @@ export function buildPumpwerk(scene, h, hooks = {}) {
       senses(ctx, W, Hc, 'Pumpensumpf', [`Wasserstand ca. ${f1(pw.li)} m über der Sohle${pw.li > 2.4 ? ' – sehr hoch!' : ''}.`,
         `Zulauf aus dem Kanal: ${pw.qIn > 75 ? 'kräftig' : 'mäßig'}, Abwasser grau, Schwimmstoffe.`,
         run ? (luft ? 'Über dem Saugrohr dreht sich ein Luftwirbel (Hohlwirbel), schlürfendes Geräusch.' : 'Wasseroberfläche über den Saugrohren ruhig.') : 'Pumpen stehen, Wasserspiegel steigt.',
-        pw.qUeb > 0 ? 'Wasser läuft über die Notüberlaufschwelle!' : 'Notüberlaufschwelle trocken.'], run);
-    } });
+        pw.qUeb > 0 ? 'Wasser läuft über die Notüberlaufschwelle!' : 'Notüberlaufschwelle trocken.', `Schild am Rahmen: OK Lukenrahmen = ${n2(LI.BEZUG)} m über Sumpfsohle.`, 'Drei Schwimmerschalter und das Kabel der Pegelsonde hängen an der Abfangung.'], run);
+    },
+    actions: () => [
+      { label: 'Abstich messen (Lichtlot ab OK Lukenrahmen)', fn: () => toast(abstich(P(), logA)) },
+      { typ: 'titel', label: 'Schwimmerschalter' },
+      { label: 'S1 Trockenlauf (0,45 m) prüfen', fn: () => toast(schwimmerPruefen(P(), 1, logA)) },
+      { label: 'S2 Notbetrieb EIN (2,00 m) prüfen', fn: () => toast(schwimmerPruefen(P(), 2, logA)) },
+      { label: 'S3 Hochwasser (2,50 m) prüfen', fn: () => toast(schwimmerPruefen(P(), 3, logA)) },
+      { label: 'Verhakten Schwimmer freimachen', fn: () => toast(schwimmerFrei(P(), logA)) },
+    ] });
+  makeInst('pw_kk', { name: 'Klemmenkasten LI-001 am Pumpensumpf', tag: 'Klemmenkasten LI-001', pos: [-200.5, 1.14, 67.27], rotY: Math.PI, size: 0.3, aspect: 1.15, res: 128,
+    info: 'Übergang vom Sondenkabel (mit Druckausgleichskapillare) auf das Feldkabel zum Schaltschrank. Trennklemmen mit Prüfbuchse: Schleifenstrom messen ohne Auftrennen. Kleinspannung 24 V DC.',
+    draw: (ctx, W, Hc) => { const L = P().lm; ctx.fillStyle = L.kkOffen ? '#636e72' : '#b2bec3'; ctx.fillRect(0, 0, W, Hc); ctx.fillStyle = '#111'; ctx.font = `bold ${W * 0.13}px Arial`; ctx.textAlign = 'center'; ctx.fillText('LI-001', W / 2, Hc * 0.3); ctx.font = `${W * 0.1}px Arial`; ctx.fillText(L.kkOffen ? 'offen' : '24 V DC', W / 2, Hc * 0.55); },
+    detail: (ctx, W, Hc) => { const L = P().lm; senses(ctx, W, Hc, 'Klemmenkasten LI-001', L.kkOffen ? ['Klemmleiste X1: 1 (+) / 2 (–) Sonde, 3 / 4 Feldkabel, Trennklemmen mit Prüfbuchse.', 'Kabelfahne Sonde: hydrostatisch 0–0,5 bar rel. ≙ 0–5 mWS,', '4–20 mA Zweileiter, Einbau 0,10 m über Sohle.'] : ['Gehäuse geschlossen, vier Schrauben.', 'Prüfbuchse der Trennklemme von außen zugänglich.'], true); },
+    actions: () => { const L = P().lm; return [
+      { label: L.kkOffen ? 'Klemmenkasten schließen' : 'Klemmenkasten öffnen', fn: () => kkOeffnen(P(), !L.kkOffen, logA) },
+      { label: 'Sichtprüfung innen', fn: () => toast(kkSicht(P(), logA)) },
+      { typ: 'titel', label: 'Messen' },
+      { label: 'Schleifenstrom an der Prüfbuchse messen', fn: () => toast(kkMessen(P(), 'loop', logA)) },
+      { label: 'Strom in der Sondenader messen (Multimeter in Reihe)', fn: () => toast(kkMessen(P(), 'sonde', logA)) },
+      { label: 'Spannung an den Sondenklemmen messen', fn: () => toast(kkMessen(P(), 'u', logA)) },
+      { typ: 'titel', label: 'Instandsetzen' },
+      { label: 'Ader neu auflegen (abisolieren, Aderendhülse)', fn: () => toast(aderAuflegen(P(), logA)) },
+      { label: 'Trocknen, Dichtung und Kabelverschraubung erneuern', fn: () => toast(kkTrocknen(P(), logA)) },
+    ]; } });
+  makeInst('pw_lis', { name: 'Pegelsonde LI-001 (Kabelabfangung an der Luke)', tag: 'Pegelsonde LI-001', pos: [-201.9, 0.78, 67.58], rotY: Math.PI, size: 0.16, aspect: 0.7, res: 128,
+    info: 'Hydrostatische Pegelsonde: misst den Wasserdruck über der Membran (1 m Wassersäule ≈ 0,1 bar). Das Kabel enthält eine Kapillare zum Ausgleich des Luftdrucks. Einbauhöhe über Sohle durch eine Markierung am Kabel an der Halteklemme festgelegt.',
+    draw: plate('LI-001', '#d6e4f0'),
+    actions: () => { const L = P().lm; return [
+      { label: L.sondeOut ? 'Sonde einhängen (Markierung an die Halteklemme)' : 'Sonde ziehen', fn: () => sondeZiehen(P(), !L.sondeOut, logA) },
+      { label: 'Sonde und Kabel begutachten', fn: () => toast(sondeBegutachten(P(), logA)) },
+      { label: 'Sonde reinigen', fn: () => toast(sondeReinigen(P(), logA)) },
+      { label: 'Gegen Ersatzsonde aus dem Lager tauschen', fn: () => toast(sondeTauschen(P(), logA)) },
+    ]; } });
 
   reg('talstr', g, { name: 'Abwasserpumpwerk Talstraße', kks: 'P-001 / P-002 · LI-001 · FI-001',
     text: 'Außenpumpwerk im Kanalnetz: Hebt das Abwasser des Ortsteils Talstraße über eine Druckleitung zur Kläranlage. Zwei baugleiche, trocken aufgestellte Kreiselpumpen (eine in Betrieb, eine in Reserve) im Pumpenraum neben dem Pumpensumpf.',

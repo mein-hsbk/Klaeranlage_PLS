@@ -39,11 +39,47 @@ export const KARTEN = {
 };
 export const VOR_ORT_BEHEBBAR = ['schieber', 'saug', 'luft', 'stopfen'];
 
+// ------------------------------------------------------------------ Niveaumessung LI-001 (Messkette)
+// Hydrostatische Pegelsonde (0–5 mWS, 4–20 mA, Einbau 0,10 m über Sohle) → Klemmenkasten am Sumpf → Feldkabel →
+// Trennverstärker im Schaltschrank → Analogeingang der Steuerung (Skalierung Messbereich + Einbauhöhe).
+// Schwimmerschalter: S1 Trockenlauf 0,45 m (hart), S2 Notbetrieb EIN 2,00 m (Nachlauf 25 min), S3 Hochwasser 2,50 m.
+export const PEGEL_KARTE = { kurz: 'Pegelmessung unplausibel', titel: 'Niveaumessung LI-001 / Niveausteuerung gestört', ursachen: {
+  kabel: 'Leitungsunterbrechung: Ader im Klemmenkasten am Sumpf korrodiert und abgerissen',
+  feucht: 'Feuchtigkeit im Klemmenkasten (Nebenschluss), Messwert springt',
+  kap: 'Pegelsonde defekt: Wasser in der Druckausgleichskapillare, Messwert driftet',
+  schlamm: 'Pegelsonde von der Halterung gerutscht, liegt verschlammt auf der Sohle',
+  skal: 'Messbereich in der Steuerung falsch eingestellt (4 m statt 5 m) nach Sondentausch',
+  trenn: 'Trennverstärker im Schaltschrank defekt (Ausgang hängt)',
+  hw: 'Hochwasserschwimmer S3 verhakt – Pegelmessung in Ordnung' } };
+export const LI = { BEZUG: 3.95, EINBAU: 0.10, MB: 5, S1: 0.45, S1_AUS: 0.7, S2: 2.0, S3: 2.5, NACHLAUF: 1500 };
+function createLM() {
+  return { ursache: null, mbPar: LI.MB, sondeOut: false, lage: 'ok', schlamm: false, kap: false, ader: true, feucht: false, kkOffen: false, trenn: true,
+    modus: 'sonde', hwHaengt: false, iSf: 4, iLoop: 4, iOut: 4, liAnz: 0, valid: true, s1: false, s2: false, s3: false, nach: 0, proto: [], getauscht: { sonde: 0, trenn: 0 }, behobenT: null };
+}
+function stepLM(pw, dt, log) {
+  const L = pw.lm, t = pw.t;
+  const drift = L.kap ? 0.16 + 0.2 * Math.sin(t / 4100) + 0.07 * Math.sin(t / 970) : 0;
+  const hLage = L.lage === 'sohle' ? 0 : LI.EINBAU;
+  const hS = L.sondeOut ? 0 : Math.max(0, pw.li - hLage) + (L.schlamm ? 0.14 : 0);
+  const iS = clamp(4 + 16 * (hS + drift) / LI.MB, 3.9, 20.5);
+  L.iSf = L.schlamm && !L.sondeOut ? approach(L.iSf, iS, 400, dt) : iS;
+  const shunt = L.feucht ? 1.3 + 0.9 * Math.sin(t / 47) * Math.sin(t / 13) + 0.35 * Math.sin(t / 5) : 0;
+  L.iLoop = L.ader ? L.iSf + shunt : 0;
+  L.iOut = L.trenn ? L.iLoop : 12.0;
+  const v = L.iOut >= 3.6 && L.iOut <= 21;
+  if (!v && L.valid) { log && log('Steuerung PW Talstr.: LI-001 Messwert gestört (Strom < 3,6 mA) – Umschaltung auf Schwimmer-Notbetrieb', 'sys'); L.modus = 'schwimmer'; }
+  L.valid = v;
+  L.liAnz = v ? (L.iOut - 4) / 16 * L.mbPar + LI.EINBAU : null;
+  L.s1 = L.s1 ? pw.li < LI.S1_AUS : pw.li < LI.S1;
+  L.s2 = pw.li >= LI.S2; L.s3 = L.hwHaengt || pw.li >= LI.S3;
+  if (L.s2) L.nach = LI.NACHLAUF; else L.nach = Math.max(0, L.nach - dt);
+}
+
 export function createPW(karte = null, ursache = null, falle = false) {
   const pumpe = (nr) => ({ nr, wahl: 'auto', rep: true, schloss: false, vs: 100, vd: 100, ablass: false, run: false, q: 0, h: 0, ps: 0, pd: 0,
     pkw: 0, amp: 0, v: 1.8, tl: 45, vorlage: 60, trueb: 0, puddle: 0, leck: 0, bh: nr === 1 ? 21840 : 19960, starts: 0, stoer: '', tsa: 0, luft: false, kav: false, laeuftT: 0 });
   const pw = { t: 8 * 3600, li: 1.2, liAus: PP.LI_AUS, liEin: PP.LI_EIN, qIn: 70, qUeb: 0, vUeb: 0, flut: 0, p: [pumpe(1), pumpe(2)],
-    karte, ursache, ursache0: ursache, falle, alarme: {}, hist: [], histNext: 0, eKwh: 0, vGef: 0, glrdSchaden: false, historie: [] };
+    karte, ursache, ursache0: ursache, falle, alarme: {}, hist: [], histNext: 0, eKwh: 0, vGef: 0, glrdSchaden: false, historie: [], lm: createLM() };
   const P1 = pw.p[0];
   if (ursache === 'schieber') P1.vd = 25;
   if (ursache === 'saug') P1.vs = 14;
@@ -92,12 +128,18 @@ export function stepPW(pw, dt, log) {
   pw.qIn = 70 * (1 + 0.3 * Math.sin(2 * Math.PI * (th - 7) / 24));
   const [P1, P2] = pw.p;
   // Steuerung: P-001 Führung, P-002 Reserve (ersetzt P-001 oder Spitzenlast)
+  stepLM(pw, dt, log);
+  const L = pw.lm;
   const anf = (x, i) => {
     if (!x.rep || x.stoer || x.wahl === '0' || x.ausgebaut) return false;
     if (x.wahl === 'hand') return true;
+    if (L.s1) return false;                                            // Trockenlaufschwimmer: hart aus
+    if (L.s3) return true;                                             // Hochwasserschwimmer: alle verfügbaren Pumpen
     const lead = i === 0 || !(P1.wahl === 'auto' && verfuegbar(P1));
-    const ein = lead ? pw.li >= pw.liEin : pw.li >= PP.LI_RES;
-    return x.run ? pw.li > pw.liAus : ein;
+    if (L.modus === 'schwimmer' || !L.valid) return lead && (x.run ? L.nach > 0 : L.s2);
+    const lv = L.liAnz;
+    const ein = lead ? lv >= pw.liEin : lv >= PP.LI_RES;
+    return x.run ? lv > pw.liAus : ein;
   };
   let qOut = 0;
   pw.p.forEach((x, i) => {
@@ -159,7 +201,11 @@ export function stepPW(pw, dt, log) {
     if (aktiv && !(a && a.aktiv)) { pw.alarme[key] = { aktiv: true, text, klasse, kommt: pw.t }; log && log(`Leitwarte kommt: ${text}`, 'alarm'); }
     else if (!aktiv && a && a.aktiv) { a.aktiv = false; a.geht = pw.t; log && log(`Leitwarte geht: ${text}`, 'alarm'); }
   };
-  al('lih', pw.li > 2.4, 'PW Talstr.: LI-001 Pegel Pumpensumpf hoch', 'W');
+  al('lih', L.valid && L.liAnz > 2.4, 'PW Talstr.: LI-001 Pegel Pumpensumpf hoch', 'W');
+  al('lim', !L.valid, 'PW Talstr.: LI-001 Messwert gestört', 'A');
+  al('hw', L.s3, 'PW Talstr.: Hochwasserschwimmer S3 angesprochen', 'A');
+  al('tl', L.s1, 'PW Talstr.: Trockenlaufschwimmer S1 angesprochen', 'W');
+  al('not', L.modus === 'schwimmer', 'PW Talstr.: Niveausteuerung im Schwimmer-Notbetrieb', 'M');
   al('ueb', pw.qUeb > 0, 'PW Talstr.: Notüberlauf in Betrieb (Abschlag ins Gewässer)', 'A');
   al('flut', pw.flut > 0.5, 'PW Talstr.: Wassermelder Pumpenraum', 'A');
   pw.p.forEach((x, i) => {
@@ -168,7 +214,7 @@ export function stepPW(pw, dt, log) {
     al(`ni${i}`, x.wahl !== 'auto', `PW Talstr.: P-00${x.nr} nicht in AUTO`, 'M');
   });
   if (pw.t >= pw.histNext) {
-    pw.hist.push({ t: pw.t, li: pw.li, q: qOut, q1: P1.q, q2: P2.q, i1: P1.amp, i2: P2.amp, v1: P1.v, vor: P1.vorlage });
+    pw.hist.push({ t: pw.t, li: L.valid ? L.liAnz : 0, lw: pw.li, q: qOut, q1: P1.q, q2: P2.q, i1: P1.amp, i2: P2.amp, v1: P1.v, vor: P1.vorlage });
     if (pw.hist.length > 2000) pw.hist.shift();
     pw.histNext = pw.t + 60;
   }
@@ -182,6 +228,14 @@ export function setupPW(karte, opt = {}) {
     ursache = k[Math.floor(Math.random() * k.length)]; falle = !opt.werkstatt && Math.random() < 0.35;
   }
   const pw = createPW(karte, ursache, falle);
+  if (opt.pegel) {                                                    // Mission Niveaumessung: Ursache zufällig
+    const k = Object.keys(PEGEL_KARTE.ursachen), u = opt.ursache || k[Math.floor(Math.random() * k.length)], L = pw.lm;
+    pw.karte = 'LM'; L.ursache = u; pw.ursache0 = u;
+    if (u === 'kabel') L.ader = false; if (u === 'feucht') L.feucht = true; if (u === 'kap') L.kap = true;
+    if (u === 'schlamm') { L.lage = 'sohle'; L.schlamm = true; } if (u === 'skal') { L.mbPar = 4; pw.historie.push('Vor 6 Tagen  Pegelsonde LI-001 durch Fremdfirma getauscht (anderes Fabrikat)'); }
+    if (u === 'trenn') L.trenn = false; if (u === 'hw') L.hwHaengt = true;
+    pw.historie.push('Heute 03:12  Bereitschaft: Störmeldung PW Talstraße, Niveausteuerung auffällig');
+  }
   pw.t = 6 * 3600; pw.histNext = pw.t;
   const fl = pw.flut; for (let i = 0; i < 2 * 3600 / 10; i++) stepPW(pw, 10);
   pw.alarme = {}; pw.eKwh = 0; pw.vGef = 0; pw.vUeb = 0; pw.flut = fl;
@@ -352,4 +406,63 @@ export function einbauen(pw, log) {
   x.ausgebaut = false; x.puddle = 0; x.qMax = 0; x.stopfenFest = x.stopfenFest || u === 'stopfen';
   pw.ws.eingebaut = true; pw.ws.repariert = ok; pw.vorlageLeerMeld = false;
   log(`P-001 Einschubeinheit wieder eingebaut (Ersatzteile ${pw.ws.kosten} €)`);
+}
+
+// ------------------------------------------------------------------ Niveaumessung: Handlungen vor Ort
+const n2 = (x) => x.toFixed(2).replace('.', ','), nmA = (x) => x.toFixed(2).replace('.', ',');
+const imSonde = (pw) => (pw.lm.modus === 'sonde' ? ' – Niveausteuerung lief im Sondenbetrieb!' : '');
+export const lmBehoben = (pw) => { const L = pw.lm, u = L.ursache; return !u || ({ kabel: L.ader, feucht: !L.feucht, kap: !L.kap, schlamm: !L.schlamm && L.lage === 'ok', skal: L.mbPar === LI.MB, trenn: L.trenn, hw: !L.hwHaengt })[u]; };
+function merkBehoben(pw, log) { if (pw.lm.ursache && lmBehoben(pw) && pw.lm.behobenT === null) { pw.lm.behobenT = pw.t; log(`LI-001 Instandsetzung abgeschlossen`, 'sys'); } }
+export function abstich(pw, log) { const a = LI.BEZUG - pw.li + (Math.random() - 0.5) * 0.01; log(`Abstich LI-001 (Lichtlot ab OK Lukenrahmen): ${n2(a)} m`, 'messung'); pw.lm.abstich = { a, t: pw.t, anz: pw.lm.valid ? pw.lm.liAnz : null }; return `Lichtlot: Wasserspiegel ${n2(a)} m unter OK Lukenrahmen.`; }
+export function schwimmerPruefen(pw, k, log) {
+  const L = pw.lm, nm = ['', 'S1 Trockenlauf', 'S2 Notbetrieb EIN', 'S3 Hochwasser'][k];
+  let t;
+  if (k === 3 && L.hwHaengt) t = 'Schwimmer S3 hängt mit dem Kabel an einem Steigeisen verhakt, Kugel steht senkrecht nach oben – Kontakt dauerhaft betätigt.';
+  else t = `Schwimmer ${nm} hängt frei, Kabel unbeschädigt; beim Anheben schaltet er hörbar – Rückmeldung an der Steuerung kommt.`;
+  log(`Schwimmerschalter ${nm} geprüft: ${t}`, 'messung'); return t;
+}
+export function schwimmerFrei(pw, log) { const L = pw.lm; if (!L.hwHaengt) return 'Alle Schwimmer hängen frei.'; L.hwHaengt = false; log('Schwimmer S3 vom Steigeisen gelöst, Kabel neu am Halter abgefangen'); merkBehoben(pw, log); return 'Schwimmer S3 hängt wieder frei.'; }
+export function sondeZiehen(pw, raus, log) {
+  const L = pw.lm; if (L.sondeOut === raus) return null;
+  if (raus) { L.sondeOut = true; log(`Pegelsonde LI-001 aus dem Sumpf gezogen${imSonde(pw)}`); return null; }
+  L.sondeOut = false; L.lage = 'ok'; log('Pegelsonde LI-001 eingehängt, Kabelmarkierung auf Halteklemme (Einbauhöhe 0,10 m über Sohle)'); merkBehoben(pw, log); return null;
+}
+export function sondeBegutachten(pw, log) {
+  const L = pw.lm; if (!L.sondeOut) return 'Die Sonde hängt im Sumpf – zum Begutachten erst ziehen.';
+  const t = L.schlamm ? 'Membranschutzkappe mit Schlamm und Sand zugesetzt; Kabelmarkierung „0,10 m“ lag 0,1 m unterhalb der Halteklemme – die Sonde ist abgerutscht und lag auf der Sohle.'
+    : L.kap ? 'Sonde äußerlich sauber. Kabelmantel ca. 2 m über der Sonde eingerissen, die Druckausgleichskapillare ist dort offen; im Kabelende im Klemmenkasten Wassertropfen.'
+    : 'Sonde und Kabel äußerlich in Ordnung, Membranschutz frei, Kabelmarkierung an der Halteklemme.';
+  log(`Pegelsonde LI-001 begutachtet: ${t}`, 'messung'); return t;
+}
+export function sondeReinigen(pw, log) { const L = pw.lm; if (!L.sondeOut) return 'Erst ziehen.'; L.schlamm = false; log('Pegelsonde LI-001 gereinigt (Membranschutzkappe gespült)'); return 'Sonde gereinigt.'; }
+export function sondeTauschen(pw, log) { const L = pw.lm; if (!L.sondeOut) return 'Erst ziehen.'; L.kap = false; L.schlamm = false; L.getauscht.sonde++; log(`Pegelsonde LI-001 gegen Ersatzsonde aus dem Lager getauscht (0–5 mWS, 4–20 mA)${imSonde(pw)}`); return 'Ersatzsonde angeschlossen – noch einhängen.'; }
+export function kkOeffnen(pw, auf, log) { pw.lm.kkOffen = auf; log(`Klemmenkasten LI-001 am Sumpf ${auf ? 'geöffnet' : 'geschlossen'}`); }
+export function kkSicht(pw, log) {
+  const L = pw.lm; if (!L.kkOffen) return 'Klemmenkasten ist geschlossen.';
+  const t = !L.ader ? 'Ader 1 (+) an Klemme X1:1 grün korrodiert und aus der Aderendhülse abgerissen; übrige Klemmen in Ordnung.'
+    : L.feucht ? 'Kondenswasser im Gehäuse, Deckeldichtung spröde und gerissen, Klemmen beschlagen.'
+    : L.kap ? 'Klemmen trocken; am Ende des Sondenkabels tritt aus der Kapillare etwas Wasser aus.'
+    : 'Klemmen trocken und fest, Dichtung in Ordnung.';
+  log(`Klemmenkasten LI-001 Sichtprüfung: ${t}`, 'messung'); return t;
+}
+export function kkMessen(pw, art, log) {
+  const L = pw.lm; let t;
+  if (art === 'loop') { const i = L.iLoop + (L.iLoop > 0 ? (Math.random() - 0.5) * 0.02 : 0); L.iGem = { i, t: pw.t }; t = `Schleifenstrom an der Prüfbuchse der Trennklemme: ${nmA(i)} mA`; }
+  else if (!L.kkOffen) return 'Für diese Messung den Klemmenkasten öffnen.';
+  else if (art === 'sonde') t = `Strom in der Sondenader (Multimeter in Reihe): ${nmA(L.ader ? L.iSf : 0)} mA${L.sondeOut ? ' (Sonde an Luft)' : ''}`;
+  else t = `Spannung an den Sondenklemmen X1:1/X1:2: ${L.ader ? '15,6' : '24,1'} V`;
+  log(`LI-001 ${t}`, 'messung'); return t;
+}
+export function aderAuflegen(pw, log) { const L = pw.lm; if (!L.kkOffen) return 'Erst öffnen.'; if (L.ader) return 'Alle Adern fest.'; L.ader = true; log(`Ader 1 an X1:1 gekürzt, neu abisoliert, neue Aderendhülse, aufgelegt${imSonde(pw)}`); merkBehoben(pw, log); return 'Ader neu aufgelegt.'; }
+export function kkTrocknen(pw, log) { const L = pw.lm; if (!L.kkOffen) return 'Erst öffnen.'; L.feucht = false; log(`Klemmenkasten getrocknet, Klemmen gereinigt, Deckeldichtung und Kabelverschraubung erneuert${imSonde(pw)}`); merkBehoben(pw, log); return 'Klemmenkasten trocken, neue Dichtung.'; }
+export function tvMessen(pw, wo, log) { const L = pw.lm, i = wo === 'ein' ? L.iLoop : L.iOut; const t = `Trennverstärker ${wo === 'ein' ? 'Eingang (Feldseite)' : 'Ausgang (zur Steuerung)'}: ${nmA(i + (i > 0 ? (Math.random() - 0.5) * 0.02 : 0))} mA`; log(`LI-001 ${t}`, 'messung'); return t; }
+export function tvTauschen(pw, log) { const L = pw.lm; L.trenn = true; L.getauscht.trenn++; log(`Trennverstärker LI-001 gegen Ersatzgerät aus dem Lager getauscht${imSonde(pw)}`); merkBehoben(pw, log); return 'Trennverstärker getauscht.'; }
+export function setNiveauModus(pw, m, log) { const L = pw.lm; if (m === L.modus) return null; if (m === 'sonde' && !L.valid) return 'Sondenbetrieb nicht möglich – Messwert gestört.'; L.modus = m; log(`Niveausteuerung auf ${m === 'sonde' ? 'Sondenbetrieb (LI-001)' : 'Schwimmer-Notbetrieb'} umgeschaltet`); return null; }
+export function setMessbereich(pw, v, log) { const L = pw.lm, a = L.mbPar; L.mbPar = clamp(Math.round(v * 100) / 100, 1, 10); log(`Parameter LI-001 Messbereichsendwert ${n2(a)} → ${n2(L.mbPar)} m${imSonde(pw)}`); merkBehoben(pw, log); }
+export function messprotokoll(pw, e, log) {
+  const L = pw.lm, ab = L.abstich, ig = L.iGem;
+  const w = { pegel: ab ? LI.BEZUG - ab.a : pw.li, abstich: ab ? ab.a : null, abT: ab ? ab.t : null, anzAb: ab ? ab.anz : null, iGem: ig ? ig.i : null, iT: ig ? ig.t : null, anz: L.valid ? L.liAnz : null, iLoop: L.iLoop, t: pw.t, behoben: lmBehoben(pw) };
+  L.proto.push({ e, w });
+  const f = (x) => (x === '' || x == null ? '–' : x);
+  log(`MESSPROTOKOLL LI-001: Abstich ${f(e.abstich)} m · Pegel berechnet ${f(e.pegel)} m · Anzeige LI-001 ${f(e.anz)} m · Strom gemessen ${f(e.iMess)} mA · Strom berechnet ${f(e.iSoll)} mA${e.bem ? ' · ' + e.bem : ''}`, 'messung');
 }

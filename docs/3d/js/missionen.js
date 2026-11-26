@@ -4,7 +4,7 @@ import { sim, startSzenario, logText, logA } from './anlage-sim.js';
 import { P } from './faulung-modell.js';
 import { f0, f1 } from './instrumente.js';
 import { sammleBericht, renderBericht, berichtAlsPDF } from './bericht.js';
-import { KARTEN, VOR_ORT_BEHEBBAR, TEILE, SCHADTEIL, wsRepariert } from './pumpwerk-modell.js';
+import { KARTEN, VOR_ORT_BEHEBBAR, TEILE, SCHADTEIL, wsRepariert, PEGEL_KARTE, LI, lmBehoben } from './pumpwerk-modell.js';
 
 const $ = (id) => document.getElementById(id);
 const hat = (re) => sim.log.some((l) => re.test(l.text));
@@ -14,6 +14,7 @@ const min = (l) => (l ? Math.round(l.tr / 60000) : null);
 
 // Diagrammvorlagen für den Bericht
 const CH = {
+  lm: { titel: 'Pegel Pumpensumpf: Anzeige LI-001 und tatsächlicher Wasserstand', einheit: 'm', src: 'P', min: 0, max: 3, serien: [{ key: 'li', label: 'LI-001 Anzeige', farbe: '#e1a100' }, { key: 'lw', label: 'tatsächlich', farbe: '#2e86de', strich: true }] },
   bhfPegel: { titel: 'Pegel Sammelbecken APW-01 (über Beckensohle)', einheit: 'm', src: 'H', min: -1, max: 5.2, serien: [{ key: 'h', label: 'Pegel', farbe: '#e1a100' }] },
   bhfQ: { titel: 'Zufluss Druckrohr DN 300 und laufende Pumpen', einheit: 'L/s bzw. Anzahl × 10', src: 'H', min: 0, max: 80, serien: [{ key: 'qz', label: 'Zufluss [L/s]', farbe: '#00a8b5' }, { key: 'np', label: 'Pumpen in Betrieb × 10', farbe: '#d63031', f: 10, strich: true }] },
   gas: { titel: 'Gasspeicher GS-1 (LI 609), Fackelbetrieb orange hinterlegt', einheit: '%', src: 'S', min: 0, max: 100, band: { key: 'f' }, serien: [{ key: 'lvl', label: 'Füllstand LI 609', farbe: '#e1a100' }] },
@@ -228,6 +229,71 @@ const BHF_MISSION = {
   },
 };
 
+// ------------------------------------------------------------------ Niveaumessung LI-001 PW Talstraße (Messkette, Fehlersuche)
+const f2 = (x) => Number(x).toFixed(2).replace('.', ',');
+const num = (x) => { if (x == null) return NaN; const t = String(x).trim().replace(',', '.'); return t === '' ? NaN : parseFloat(t); };
+const isoll = (pegel) => 4 + 16 * (pegel - LI.EINBAU) / LI.MB;
+const nachT = (p) => sim.P.lm.behobenT !== null && p.w.abT !== null && p.w.abT >= sim.P.lm.behobenT && p.w.iT !== null && p.w.iT >= sim.P.lm.behobenT;
+function protoVor() { return sim.P.lm.proto.find((p) => !p.w.behoben); }
+function protoNach() { return [...sim.P.lm.proto].reverse().find((p) => p.w.behoben && nachT(p)); }
+// Eintragungen werden gegen die eigenen Messungen geprüft (letzter Abstich, letzte Messung an der Prüfbuchse)
+const protoErfasst = (p) => { if (!p || p.w.abstich === null) return false; const a = num(p.e.abstich), pg = num(p.e.pegel); return Math.abs(a - p.w.abstich) <= 0.03 && Math.abs(pg - (LI.BEZUG - a)) <= 0.02; };
+const protoSoll = (p) => { if (!p) return false; const pg = num(p.e.pegel), i = num(p.e.iSoll); return Math.abs(i - isoll(pg)) <= 0.1; };
+const protoMess = (p) => {
+  if (!p || p.w.iGem === null || p.w.abT === null) return false;
+  const e = p.e, w = p.w, fe = sim.P.lm.ursache === 'feucht' && !w.behoben, tolI = fe ? 0.8 : 0.12, tolA = fe ? 0.5 : 0.1;
+  const zeitnah = Math.abs(w.iT - w.abT) <= 900;
+  const iOk = Math.abs(num(e.iMess) - w.iGem) <= tolI;
+  const a = String(e.anz ?? '').trim(), ungueltig = a === '' || /^[-–—]+$|gest/i.test(a);
+  const aOk = [w.anzAb, w.anz].some((x) => (x === null ? ungueltig : Math.abs(num(a) - x) <= tolA));
+  return zeitnah && iOk && aOk;
+};
+function pegelChecks() {
+  const P = sim.P, L = P.lm, u = L.ursache;
+  return [
+    ['Störungsspeicher und Anzeige der Pumpensteuerung angesehen', () => hat(/angesehen: PW-Steuerung/), 'Ausgangspunkt jeder Fehlersuche: Welche Meldungen stehen an, in welcher Betriebsart läuft die Niveausteuerung?'],
+    ['Wasserstand unabhängig gemessen (Abstich mit Lichtlot)', () => hat(/Abstich LI-001/), 'Ohne unabhängige Vergleichsmessung lässt sich nicht entscheiden, ob die Anzeige falsch ist.'],
+    ['Schleifenstrom an der Prüfbuchse im Klemmenkasten gemessen', () => hat(/LI-001 Schleifenstrom an der Prüfbuchse/), 'Der Strom in der Feldschleife ist das eigentliche Messsignal: 4 mA ≙ Messanfang, 20 mA ≙ Messende, < 3,6 mA ≙ Leitungsunterbrechung.'],
+    ['Strom am Ein- und Ausgang des Trennverstärkers gemessen', () => hat(/Trennverstärker Eingang/) && hat(/Trennverstärker Ausgang/), 'Der Vergleich Eingang/Ausgang zeigt, ob das Signal im Schaltschrank verfälscht wird.'],
+    ['Alle drei Schwimmerschalter geprüft', () => hat(/Schwimmerschalter S1/) && hat(/Schwimmerschalter S2/) && hat(/Schwimmerschalter S3/), 'Die Schwimmer sichern Trockenlauf und Hochwasser ab und tragen den Notbetrieb – sie gehören zu jeder Prüfung der Niveausteuerung.'],
+    ['Messprotokoll vor der Instandsetzung: Abstich und Pegel richtig erfasst', () => protoErfasst(protoVor()), 'Pegel = Bezugshöhe − Abstich (Bezug OK Lukenrahmen 3,95 m über Sumpfsohle).'],
+    ['Messprotokoll vor der Instandsetzung: Sollstrom richtig berechnet', () => protoSoll(protoVor()), 'I = 4 mA + 16 mA · (Pegel − 0,10 m) / 5 m (Messbereich der Sonde 0–5 mWS, Einbau 0,10 m über Sohle).'],
+    ['Messprotokoll vor der Instandsetzung: Strom und Anzeige richtig abgelesen', () => protoMess(protoVor()), 'Strom an der Prüfbuchse und Anzeige zeitnah zum Abstich ablesen (höchstens 15 min Abstand) – erst der Vergleich Soll/Ist lokalisiert den Fehler.'],
+    ['Ursache richtig festgestellt (Auswahl in der Meldung)', () => sim.diagnose === u, 'Die Diagnose begründet, welches Teil der Messkette instand gesetzt wird.'],
+    ['Messkette nur im Schwimmer-Notbetrieb bearbeitet', () => !hat(/Niveausteuerung lief im Sondenbetrieb!/), 'Wer an Sonde, Leitung, Trennverstärker oder Parametern arbeitet, während die Pumpen nach dem Messwert schalten, riskiert Trockenlauf oder Überlauf.'],
+    ['Ursache beseitigt', () => lmBehoben(P), 'Die Messkette liefert wieder den richtigen Wert.'],
+    ['Keine intakten Teile getauscht', () => (L.getauscht.sonde === 0 || u === 'kap') && (L.getauscht.trenn === 0 || u === 'trenn'), 'Tauschen „auf Verdacht“ kostet Geld und verschleiert die Ursache. Eine verschlammte Sonde wird gereinigt, nicht ersetzt.'],
+    ['Funktionsprüfung nach der Instandsetzung (zweites Protokoll: Anzeige = Pegel ± 0,05 m)', () => { const p = protoNach(); return !!p && protoErfasst(p) && protoMess(p) && Math.abs(num(p.e.anz) - num(p.e.pegel)) <= 0.06 && Math.abs(num(p.e.iMess) - num(p.e.iSoll)) <= 0.2; }, 'Erst die Kontrollmessung nach der Reparatur (neuer Abstich, neue Strommessung) belegt, dass die Messkette wieder stimmt: Anzeige = Pegel, Strom = Sollstrom.'],
+    ['Anlage in Normalbetrieb übergeben (Sondenbetrieb, Sonde eingehängt, Klemmenkasten zu, Pumpen AUTO)', () => L.modus === 'sonde' && !L.sondeOut && L.lage === 'ok' && !L.kkOffen && P.p.every((x) => x.wahl === 'auto' && x.rep), 'Nach Arbeiten an der Messkette läuft die Niveausteuerung wieder nach LI-001.'],
+    ['Kein Notüberlauf und kein Trockenlauf während der Arbeiten', () => P.vUeb < 0.5 && !hat(/Abschaltung durch Trockenlaufschutz/), 'Während der Fehlersuche muss das Pumpwerk weiter sicher fördern.'],
+    ['Meldung an die Schichtleitung abgegeben', meldung, 'Befund mit Messwerten, Ursache, Maßnahme, Ergebnis der Funktionsprüfung.'],
+  ];
+}
+const PEGEL_MISSION = {
+  id: 'pegel', titel: 'Pegelmessung PW Talstraße unplausibel', bereich: 'Pumpwerk Talstraße · Messtechnik', dauer: '45–60 min', stufe: 3, faul: 'S0', bel: 'B0', pw: null, pwOpt: { pegel: true }, diag: true, start: 'talstr', tab: 'pw', vorlauf: 2, speed: 5,
+  auftrag: 'Im Abwasserpumpwerk Talstraße ist die Niveausteuerung seit der Nacht auffällig. Prüfe die Messkette der Pegelmessung LI-001 von der Sonde bis zur Steuerung, erfasse deine Messwerte in einem Messprotokoll, finde die Ursache und setze die Messung instand. Belege den Erfolg mit einer Kontrollmessung und gib eine Meldung mit der festgestellten Ursache ab. Das Pumpwerk muss währenddessen sicher weiterlaufen.',
+  auftragStart: 'Schichtbeginn. Die Bereitschaft hat heute Nacht um 03:12 eine Störmeldung vom Abwasserpumpwerk Talstraße bekommen: Die Niveausteuerung ist auffällig, die Pumpen schalten nicht wie gewohnt, der angezeigte Pegel kommt den Kollegen merkwürdig vor. Gefunden wurde nichts. Prüfe die Messkette LI-001 von der Pegelsonde bis zur Steuerung, halte deine Messwerte im Messprotokoll fest, setze die Messung instand und belege den Erfolg mit einer Kontrollmessung. Das Pumpwerk muss währenddessen sicher weiterlaufen. Gib zum Schluss eine Meldung mit der Ursache ab.',
+  lehrer: `Die Ursache wird bei jedem Start zufällig gezogen: ${Object.values(PEGEL_KARTE.ursachen).join(' · ')}. Messkette: hydrostatische Sonde 0–5 mWS, 4–20 mA, Einbau 0,10 m über Sohle → Klemmenkasten am Sumpf (Prüfbuchse) → Trennverstärker im Schaltschrank → Steuerung (Anzeige = (I − 4)/16 · Messbereich + 0,10 m). Bezug OK Lukenrahmen 3,95 m über Sohle. Mindestpensum unabhängig von der Ursache: Störungsspeicher, Abstich, Schleifenstrom, Trennverstärker Ein/Aus, alle Schwimmer, Messprotokoll vor der Instandsetzung (Pegel = 3,95 − Abstich; I_soll = 4 + 16 · (Pegel − 0,10)/5), Arbeiten nur im Schwimmer-Notbetrieb, Kontrollprotokoll danach, Übergabe in den Sondenbetrieb. Erkennungsmerkmale: Leitungsunterbrechung 0 mA, 24 V Leerlaufspannung an den Sondenklemmen, Ader abgerissen; Feuchtigkeit: Schleifenstrom springt, Sondenader-Strom kleiner als Schleifenstrom (Nebenschluss); Kapillare: Strom passt nicht zum Abstich und wandert, an Luft nicht 4,00 mA, Kabelmantel eingerissen → Sonde tauschen; Schlamm: Strom zu hoch und träge, Kabelmarkierung verrutscht → reinigen, auf Markierung einhängen; Messbereich: Strom passt zum Abstich, Anzeige nicht (Faktor 0,8) → Parameter 5,00 m (Kabelfahne); Trennverstärker: Eingang plausibel, Ausgang fest 12,00 mA; Hochwasserschwimmer: Messkette stimmt, S3 dauerhaft betätigt → freimachen.`,
+  lehrerBericht() { const u = sim.P.lm.ursache; return `Gezogen: ${PEGEL_KARTE.ursachen[u]}. ${this.lehrer}`; },
+  checks: pegelChecks,
+  werte: () => { const P = sim.P, L = P.lm; return [['LI-001 Anzeige', L.valid ? f2(L.liAnz) : '––', 'm'], ['Wasserstand tatsächlich', f2(P.li), 'm'], ['Schleifenstrom', f2(L.iLoop), 'mA'], ['Niveausteuerung', L.modus === 'sonde' ? 'Sonde' : 'Schwimmer-Notbetrieb', ''], ['Messbereich Steuerung', f2(L.mbPar), 'm'], ['Starts P-001 / P-002', `${P.p[0].starts} / ${P.p[1].starts}`, ''], ['Notüberlauf seit Start', f0(P.vUeb), 'm³']]; },
+  charts: [CH.lm, CH.qpw],
+  kennzahlTitel: 'Messprotokolle',
+  kennzahl: () => { const L = sim.P.lm; return L.proto.length ? L.proto.map((p, i) => `${i + 1}. ${p.w.behoben ? 'nach' : 'vor'} der Instandsetzung – eingetragen: Abstich ${p.e.abstich || '–'} m, Pegel ${p.e.pegel || '–'} m, Anzeige ${p.e.anz || '–'} m, Strom ${p.e.iMess || '–'} mA, Soll ${p.e.iSoll || '–'} mA | tatsächlich: Pegel ${f2(p.w.pegel)} m, Anzeige ${p.w.anz === null ? '––' : f2(p.w.anz)} m, Schleifenstrom ${f2(p.w.iLoop)} mA`).join('  ·  ') : 'Es wurde kein Messprotokoll ausgefüllt.'; },
+  hinweise: () => {
+    const h = [], L = sim.P.lm, u = L.ursache;
+    h.push(`Gezogene Ursache: ${PEGEL_KARTE.ursachen[u]}.`);
+    if (sim.diagnose && sim.diagnose !== u) h.push(`Gewählt wurde: ${sim.diagnose === 'unklar' ? 'Ursache nicht eindeutig' : PEGEL_KARTE.ursachen[sim.diagnose]}.`);
+    const v = protoVor(); if (v) { const pg = num(v.e.pegel); if (!isNaN(pg)) h.push(`Sollstrom zum eingetragenen Pegel ${String(v.e.pegel)} m: ${f2(isoll(pg))} mA (eingetragen: ${v.e.iSoll || '–'} mA).`); }
+    if (hat(/Niveausteuerung lief im Sondenbetrieb!/)) h.push(`Arbeiten im Sondenbetrieb: ${sim.log.filter((l) => /Niveausteuerung lief im Sondenbetrieb!/.test(l.text)).map((l) => l.text.split(' – ')[0]).join('; ')}.`);
+    if (L.getauscht.sonde && u !== 'kap') h.push('Die Sonde wurde getauscht, obwohl sie nicht defekt war.');
+    if (L.getauscht.trenn && u !== 'trenn') h.push('Der Trennverstärker wurde getauscht, obwohl er in Ordnung war.');
+    if (sim.P.vUeb > 0.5) h.push(`Notüberlauf angesprungen: ${f0(sim.P.vUeb)} m³.`);
+    if (!protoNach()) h.push('Es fehlt das Kontrollprotokoll nach der Instandsetzung.');
+    return h;
+  },
+};
+
 // Gruppierung und Nummerierung nach Lernfeldern (Umwelttechnologe für Abwasserbewirtschaftung)
 export const LERNFELDER = [
   { lf: 0, titel: 'Einstieg', sub: 'alle Ausbildungsjahre' },
@@ -237,7 +303,7 @@ export const LERNFELDER = [
   { lf: 15, titel: 'Abwassertechnische Anlagen steuern und regeln', sub: '3. Ausbildungsjahr' },
 ];
 const ZUORDNUNG = { frei: [0, '0', 'Einweisung'], bhf: [4, '4.1', 'Bauwerke prüfen'], pw_K1: [6, '6.1', 'Störungskarten Pumpwerk Talstraße'], pw_K2: [6, '6.2', 'Störungskarten Pumpwerk Talstraße'], pw_K3: [6, '6.3', 'Störungskarten Pumpwerk Talstraße'], pw_K4: [6, '6.4', 'Störungskarten Pumpwerk Talstraße'],
-  pw_zufall: [6, '6.5', 'Zufallskarte und Instandsetzung'], pw_werkstatt: [6, '6.6', 'Zufallskarte und Instandsetzung'], pw_komplett: [6, '6.7', 'Zufallskarte und Instandsetzung'], bhkw: [12, '12.1', 'Faulung und Gasverwertung'], heizung: [12, '12.2', 'Faulung und Gasverwertung'], geblaese: [15, '15.1', 'Belüftungsregelung'] };
+  pw_zufall: [6, '6.5', 'Zufallskarte und Instandsetzung'], pw_werkstatt: [6, '6.6', 'Zufallskarte und Instandsetzung'], pw_komplett: [6, '6.7', 'Zufallskarte und Instandsetzung'], bhkw: [12, '12.1', 'Faulung und Gasverwertung'], heizung: [12, '12.2', 'Faulung und Gasverwertung'], geblaese: [15, '15.1', 'Belüftungsregelung'], pegel: [15, '15.2', 'Messtechnik'] };
 
 export const MISSIONEN = [
   {
@@ -332,6 +398,7 @@ export const MISSIONEN = [
     },
   },
   BHF_MISSION,
+  PEGEL_MISSION,
   ...Object.keys(KARTEN).map((k) => pwMission(k)),
   ...['zufall', 'werkstatt', 'komplett'].map((art) => ({ ...pwMission('K1', art), wuerfel: () => pwMission(Object.keys(KARTEN)[Math.floor(Math.random() * 4)], art) })),
 ];
@@ -366,7 +433,7 @@ export function initMissionen({ ui, walk, wks, setExam, bhf }) {
     const exam = $('misExam').checked; ui.erklaer = !exam; setExam(exam);
     startSzenario({ faul: m.faul, bel: m.bel, pw: m.pw || null, pwOpt: m.pwOpt || {}, speed: m.speed || +$('spSel').value, titel: `Mission „${m.titel}“${exam ? ' (Prüfungsmodus)' : ''}` });
     if (m.onStart) m.onStart();
-    ui.diagnose = !!m.pw;
+    ui.diagnose = !!(m.pw || m.diag); document.body.classList.toggle('mis-pegel', m.id === 'pegel');
     aktiv = m; ctx = { t0: performance.now(), tSim0: sim.S.t, exam, werteStart: m.werte ? m.werte() : [] };
     $('mis').style.display = 'none';
     $('briefT').textContent = m.titel; $('briefM').textContent = `${m.bereich} · ${m.dauer}`; $('briefA').textContent = m.auftragStart || m.auftrag;
