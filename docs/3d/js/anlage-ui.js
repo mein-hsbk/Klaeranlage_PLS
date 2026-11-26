@@ -3,6 +3,7 @@
 import { P, fmtZeit } from './faulung-modell.js';
 import { PB, STR, MODI } from './belueftung-modell.js';
 import { PP, KARTEN, PEGEL_KARTE } from './pumpwerk-modell.js';
+import { PO } from './pwost-modell.js';
 import { sim, logA, logText } from './anlage-sim.js';
 import { insts, f1, f0 } from './instrumente.js';
 
@@ -62,14 +63,14 @@ export function initAnlageUI() {
 
   // ---------------- Leitwarte mit Reitern
   let plsOpen = false, tab = 'faul';
-  const TABN = { faul: 'Faulung/Gas', bel: 'Belüftung', pw: 'PW Talstraße' };
+  const TABN = { faul: 'Faulung/Gas', bel: 'Belüftung', pw: 'PW Talstraße', ost: 'PW Industriegebiet Ost' };
   const togglePLS = (quiet) => { plsOpen = !plsOpen; $('pls').style.display = plsOpen ? 'block' : 'none'; $('bPLS').classList.toggle('on', plsOpen); if (plsOpen) { if (quiet !== true) logA(`Leitwarte geöffnet (${TABN[tab]})`, 'blick'); renderPLS(); } };
   ui.showPLS = (t) => { if (t) setTab(t, true); if (!plsOpen) togglePLS(true); };
   $('bPLS').onclick = () => togglePLS(); $('plsClose').onclick = () => togglePLS();
   addEventListener('keydown', (e) => { if (e.code === 'Tab' && document.body.classList.contains('walking')) { e.preventDefault(); togglePLS(); } });
   function setTab(t, silent) {
     tab = t; for (const b of document.querySelectorAll('#plsTabs .btn')) b.classList.toggle('on', b.dataset.t === t);
-    $('plsFaul').style.display = t === 'faul' ? '' : 'none'; $('plsBel').style.display = t === 'bel' ? '' : 'none'; $('plsPW').style.display = t === 'pw' ? '' : 'none';
+    $('plsFaul').style.display = t === 'faul' ? '' : 'none'; $('plsBel').style.display = t === 'bel' ? '' : 'none'; $('plsPW').style.display = t === 'pw' ? '' : 'none'; $('plsOst').style.display = t === 'ost' ? '' : 'none';
     if (!silent) logA(`Leitwarte: Bild ${TABN[t]}`, 'blick');
     renderPLS();
   }
@@ -116,6 +117,25 @@ export function initAnlageUI() {
       <div class="cnt">Seit Start: gefördert ${f0(W.vGef)} m³ · Energie ${f0(W.eKwh)} kWh${W.vUeb > 0 ? ` · <span class="a">Notüberlauf ${f0(W.vUeb)} m³</span>` : ''}</div>`;
       $('pwAl').innerHTML = alarmList(Object.values(W.alarme));
       drawTrend($('trendP'), W.hist, W.t, 3, [['li', '#ffd32a', (v) => v / 3 * 100], ['q1', '#00d2d3', (v) => v / 1.5], ['q2', '#74b9ff', (v) => v / 1.5], ['i1', '#ff6b6b', (v) => v / 30 * 100]]);
+    } else if (tab === 'ost') {
+      const W = sim.O, st = (x) => !x.rep ? 'Rep.-Sch. 0' : x.run ? 'Betrieb' : 'Bereit', cl = (x) => (!x.rep ? 'a' : '');
+      $('ostVals').innerHTML = `<table>
+        ${row('LI-101', 'Pegel Pumpensumpf', num(W.li, 2), 'm', W.li > PO.LI_HOCH ? 'a' : W.li > 2.0 ? 'w' : '')}
+        ${row('FI-101', 'Förderstrom Druckleitung DL-02', f0(W.q), 'm³/h', W.alarme.qn && W.alarme.qn.aktiv ? 'w' : '')}
+        ${row('', 'Ein- / Ausschaltpegel', `${num(W.liEin, 2)} / ${num(W.liAus, 2)}`, 'm')}
+        ${row('', 'Spitzenlast-Zuschaltung P-002', W.spitze ? 'freigegeben' : 'gesperrt', '')}
+      </table><table style="margin-top:4px">
+        <tr><td></td><td></td><td class="v hd">P-001</td><td class="v hd">P-002</td><td></td></tr>
+        <tr><td class="tg">YS</td><td>Zustand</td><td class="v ${cl(W.p[0])}">${st(W.p[0])}</td><td class="v ${cl(W.p[1])}">${st(W.p[1])}</td><td></td></tr>
+        <tr><td class="tg">HS</td><td>Wahlschalter</td>${W.p.map((x) => `<td class="v ${x.wahl !== 'auto' ? 'w' : ''}">${({ hand: 'HAND', '0': '0', auto: 'AUTO' })[x.wahl]}</td>`).join('')}<td></td></tr>
+        <tr><td class="tg">SI</td><td>Frequenz</td><td class="v ${W.p[0].fuOrt ? 'w' : ''}">${num(W.p[0].f)}${W.p[0].fuOrt ? ' ORT' : ''}</td><td class="v">${W.p[1].run ? '50,0' : '0,0'}</td><td class="u">Hz</td></tr>
+        <tr><td class="tg">II</td><td>Motorstrom</td><td class="v">${num(W.p[0].amp)}</td><td class="v">${num(W.p[1].amp)}</td><td class="u">A</td></tr>
+        <tr><td class="tg">PT</td><td>Druck saug / druck</td><td class="v">${num(W.p[0].ps, 2)} / ${num(W.p[0].pd, 2)}</td><td class="v">${num(W.p[1].ps, 2)} / ${num(W.p[1].pd, 2)}</td><td class="u">bar</td></tr>
+        <tr><td class="tg"></td><td>Betriebsstunden</td><td class="v">${f0(W.p[0].bh)}</td><td class="v">${f0(W.p[1].bh)}</td><td class="u">h</td></tr>
+      </table>
+      <div class="cnt">Seit Start: gefördert ${f0(W.vGef)} m³ · Energie ${f0(W.eKwh)} kWh${W.vUeb > 0 ? ` · <span class="a">Notüberlauf ${f0(W.vUeb)} m³</span>` : ''}</div>`;
+      $('ostAl').innerHTML = alarmList(Object.values(W.alarme));
+      drawTrend($('trendO'), W.hist, W.t, 6, [['li', '#ffd32a', (v) => v / 3 * 100], ['q', '#00d2d3', (v) => v / 1.2], ['qin', '#ff9f43', (v) => v / 1.2], ['f1', '#a29bfe', (v) => v * 2]]);
     } else {
       const B = sim.B;
       $('belVals').innerHTML = `<table>
@@ -211,7 +231,7 @@ export function initAnlageUI() {
     t -= dt; if (t > 0) return; t = 0.5;
     const S = sim.S;
     $('simClock').textContent = `Tag ${Math.floor(S.t / 86400) + 1} · ${fmtZeit(S.t)} · ×${sim.speed}`;
-    const nA = [...Object.values(S.alarme), ...Object.values(sim.B.alarme), ...Object.values(sim.P.alarme)].filter((a) => a.aktiv && a.klasse === 'A').length;
+    const nA = [...Object.values(S.alarme), ...Object.values(sim.B.alarme), ...Object.values(sim.P.alarme), ...Object.values(sim.O.alarme)].filter((a) => a.aktiv && a.klasse === 'A').length;
     $('bPLS').textContent = nA ? `Leitwarte (${nA} ⚠)` : 'Leitwarte';
     $('bPLS').classList.toggle('alarm', nA > 0);
     if (plsOpen) renderPLS();

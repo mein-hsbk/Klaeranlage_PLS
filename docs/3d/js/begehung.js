@@ -19,6 +19,7 @@ export const STATIONEN = {
   rs: { n: 'RS-Pumpwerk', p: [82, -36, 72, -40] },
   talstr: { n: 'PW Talstraße', p: [-187.6, 67.4, -190.6, 68.3] },
   bahnhof: { n: 'PW Bahnhofstraße', p: [-246.2, 63.2, -248.4, 70] },
+  ost: { n: 'PW Ind.-Ost', p: [215.1, 15.4, 212.1, 16.3] },
 };
 
 export function createWalk({ scene, camera, canvas, controls, fence, areas = [], walls = [], getInstMeshes, insts, onInspect, onPickComp, isBlocked }) {

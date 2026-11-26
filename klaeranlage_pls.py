@@ -520,8 +520,13 @@ def _(get_pk, np):
     _tgm = sum(_TG) / 24.0
     TAGESGANG = [v / _tgm for v in _TG]
 
-    def talstrasse_sim(hist, th, q_tw_ka=12000.0):
-        """Schaltbetrieb PW Talstraße der letzten 48 h (2-min-Schritte, 12 h Vorlauf)."""
+    def talstrasse_sim(hist, th, q_tw_ka=12000.0, p001_ein=False):
+        """Schaltbetrieb PW Talstraße der letzten 48 h (2-min-Schritte, 12 h Vorlauf).
+
+        p001_ein=True: Läuft P-001 zum aktuellen Zeitpunkt nicht, wird der Schaltzyklus um
+        einige Minuten verschoben (Simulationsfenster früher gestartet und auf th bezogen),
+        bis P-001 läuft – für das Ablesen der Messwerte nach +6 h / +24 h / +7 Tage.
+        Physik und Schaltpunkte bleiben unverändert, nur die Phase des Zyklus verschiebt sich."""
         kl1 = AGGREGATE["P-001"]["kl"]
         s = STANDORTE["APW03"]
         z0, dz = 54.2, 0.1
@@ -536,34 +541,46 @@ def _(get_pk, np):
         ht = [p["t"] for p in hist] if hist else [0.0]
         fq = [p.get("Q_roh", q_tw_ka) / q_tw_ka for p in hist] if hist else [1.0]
         t0 = int(th) - 60
-        qin_h = [TAL["q_tw"] * TAGESGANG[(t0 + j) % 24] * float(np.interp(t0 + j + 0.5, ht, fq)) for j in range(61)]
+        _VV = 6  # max. Verschiebung in h (zusätzlicher Vorlauf für p001_ein)
+        qin_h = [TAL["q_tw"] * TAGESGANG[(t0 - _VV + j) % 24] * float(np.interp(t0 - _VV + j + 0.5, ht, fq))
+                 for j in range(61 + _VV)]
         dt = 2.0 / 60.0
         n = int(round(60.0 / dt))
-        z = 55.00; on1 = False; on2 = False; V = 380.0
-        T, Z, QF, Q1, O1, O2, H1, VS, UEB, NUE = [], [], [], [], [], [], [], [], [], []
-        for i in range(n):
-            t = t0 + i * dt
-            q_in = qin_h[int(i * dt)]
-            if z >= TAL["z_ein1"]: on1 = True
-            if z <= TAL["z_aus1"]: on1 = False
-            if z >= TAL["z_ein2"]: on2 = True
-            if z <= TAL["z_aus2"]: on2 = False
-            if on1 and on2:
-                qp = _zi(q2g, z); q_out = 2 * qp; hp = _zi(h2g, z)
-            elif on1:
-                qp = _zi(q1g, z); q_out = qp; hp = _zi(h1g, z)
-            else:
-                qp = 0.0; q_out = 0.0; hp = 0.0
-            q_dr = min(TAL["q_dr"], V / dt + q_out)
-            V = V + (q_out - q_dr) * dt
-            ueb = V > TAL["V_sb"]
-            V = min(max(V, 0.0), TAL["V_sb"])
-            nue = z >= TAL["z_nue"]
-            if t >= th - 48.0:
-                T.append(t); Z.append(z); QF.append(q_out); Q1.append(qp if on1 else 0.0)
-                O1.append(on1); O2.append(on1 and on2); H1.append(hp); VS.append(V)
-                UEB.append(ueb); NUE.append(nue)
-            z = min(z + (q_in - q_out) * dt / TAL["A_sumpf"], TAL["z_nue"])
+        def _lauf(k):
+            # k: Verschiebung in Zeitschritten; Startzustand wie bisher
+            z = 55.00; on1 = False; on2 = False; V = 380.0
+            T, Z, QF, Q1, O1, O2, H1, VS, UEB, NUE = [], [], [], [], [], [], [], [], [], []
+            for i in range(n):
+                t = t0 + i * dt
+                q_in = qin_h[int(_VV + (i - k) * dt)]
+                if z >= TAL["z_ein1"]: on1 = True
+                if z <= TAL["z_aus1"]: on1 = False
+                if z >= TAL["z_ein2"]: on2 = True
+                if z <= TAL["z_aus2"]: on2 = False
+                if on1 and on2:
+                    qp = _zi(q2g, z); q_out = 2 * qp; hp = _zi(h2g, z)
+                elif on1:
+                    qp = _zi(q1g, z); q_out = qp; hp = _zi(h1g, z)
+                else:
+                    qp = 0.0; q_out = 0.0; hp = 0.0
+                q_dr = min(TAL["q_dr"], V / dt + q_out)
+                V = V + (q_out - q_dr) * dt
+                ueb = V > TAL["V_sb"]
+                V = min(max(V, 0.0), TAL["V_sb"])
+                nue = z >= TAL["z_nue"]
+                if t >= th - 48.0:
+                    T.append(t); Z.append(z); QF.append(q_out); Q1.append(qp if on1 else 0.0)
+                    O1.append(on1); O2.append(on1 and on2); H1.append(hp); VS.append(V)
+                    UEB.append(ueb); NUE.append(nue)
+                z = min(z + (q_in - q_out) * dt / TAL["A_sumpf"], TAL["z_nue"])
+            return T, Z, QF, Q1, O1, O2, H1, VS, UEB, NUE
+        T, Z, QF, Q1, O1, O2, H1, VS, UEB, NUE = _lauf(0)
+        if p001_ein and not all(O1[-2:]):
+            for _k in range(1, int(_VV / dt) + 1):
+                _r = _lauf(_k)
+                if all(_r[4][-2:]):
+                    T, Z, QF, Q1, O1, O2, H1, VS, UEB, NUE = _r
+                    break
         d = int(th // 24)
         a, b = 24.0 * (d - 1), 24.0 * d
         lz1 = sum(1 for t, o in zip(T, O1) if a <= t < b and o) * dt
@@ -1226,12 +1243,15 @@ def _(
             if t_init < 48:
                 proc = advance(proc, ctrl, 1.0, float(t_init))
         total_hours = 48
+        letzter_schritt = 0  # 0 = Start/Reset
     else:
         proc = prev["proc"]
         rausch = prev.get("rausch", {})
         current = prev.get("current", dict(proc))
         history = prev.get("history", [])
         total_hours = prev.get("total_hours", 0)
+        # Letzter Zeitschritt bleibt erhalten, bis ein neuer Button gedrückt wird
+        letzter_schritt = dt if dt > 0 else prev.get("letzter_schritt", 0)
 
         if dt > 0:
             for _ in range(int(dt)):
@@ -1357,7 +1377,7 @@ def _(
     set_sim_state({
         "current": current, "proc": proc, "rausch": rausch, "targets": targets, "history": history,
         "kaskade": ctrl["kaskade"],
-        "total_hours": total_hours,
+        "total_hours": total_hours, "letzter_schritt": letzter_schritt,
         "_b1": _b1, "_b6": _b6, "_b24": _b24, "_b7d": _b7d, "_breset": _breset,
         "eta_csb": eta_csb, "eta_n": eta_n, "eta_p": eta_p,
         "fr_csb_zu": fr_csb_zu, "fr_csb_ab": fr_csb_ab,
@@ -4390,7 +4410,9 @@ def _(
 
         # --- Andere Pumpwerke im Netz (Live-Deko, nur Übersicht) ---
         pw_ost_fuell = min(95, 30 + (rf - 1) * 25)
-        tal = pm["talstrasse_sim"](hist, th, 12000.0)
+        # Nach Start/Reset, +6 h, +24 h, +7 Tage läuft P-001 sicher (Messwerte ablesbar);
+        # nur über +1 h ergibt sich der natürliche Schaltzustand (auch „Pumpen aus“).
+        tal = pm["talstrasse_sim"](hist, th, 12000.0, p001_ein=st.get("letzter_schritt", 0) != 1)
         pw_tal_fuell = min(100.0, max(0.0, (tal["z"][-1] - pm["tal"]["z_sohle"]) / (pm["tal"]["z_nue"] - pm["tal"]["z_sohle"]) * 100))
         pw_ind_fuell = min(95, 20 + (rf - 1) * 30)
 
@@ -4444,8 +4466,8 @@ def _(
 
           <!-- PW OST -->
           <rect x="40" y="195" width="150" height="70" rx="6" fill="#16213e" stroke="#0984e3" stroke-width="1.5"/>
-          <text x="115" y="214" fill="#74b9ff" text-anchor="middle" font-size="10" font-weight="bold" font-family="monospace">PW OST</text>
-          <text x="115" y="228" fill="#b2bec3" text-anchor="middle" font-size="8" font-family="monospace">KKS: APW-02</text>
+          <text x="115" y="214" fill="#74b9ff" text-anchor="middle" font-size="10" font-weight="bold" font-family="monospace">PW INDUSTRIEGEB. OST</text>
+          <text x="115" y="228" fill="#b2bec3" text-anchor="middle" font-size="8" font-family="monospace">KKS: APW-02 · DL-02 400 m</text>
           <rect x="50" y="236" width="130" height="10" fill="#2d3436" stroke="#0f3460" stroke-width="1"/>
           <rect x="50" y="236" width="{1.3 * pw_ost_fuell}" height="10" fill="{_pw_farbe(pw_ost_fuell)}"/>
           <text x="115" y="259" fill="#dfe6e9" text-anchor="middle" font-size="9" font-family="monospace">{pw_ost_fuell:.0f} %</text>
@@ -4795,7 +4817,7 @@ def _(
 
             # Hinweis zu den anderen Pumpwerken (neutral, ohne didaktischen Bezug)
             mo.Html('''<div class="pls"><div class="pls-c" style="border-color:#0984e3">
-                <h3 style="color:#74b9ff">ℹ️ Weitere Pumpwerke (PW Ost, PW Industriepark)</h3>
+                <h3 style="color:#74b9ff">ℹ️ Weitere Pumpwerke (PW Industriegebiet Ost, PW Industriepark)</h3>
                 <p style="font-size:0.85em;color:#b2bec3;margin:0">
                     Für diese Außenstationen liegen aktuell nur die Live-Füllstände auf der Netzübersicht
                     vor. Ausführliche Bauwerksdatenblätter können auf Anforderung aus dem Bauarchiv

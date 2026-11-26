@@ -3,11 +3,13 @@
 import { createState, run as runFaul, step as stepFaul, fmtZeit, tag } from './faulung-modell.js';
 import { setupBel, stepBel } from './belueftung-modell.js';
 import { setupPW, stepPW } from './pumpwerk-modell.js';
+import { setupOst, stepOst } from './pwost-modell.js';
 
 export const sim = {
   S: createState('S0'),     // Faulung/Gas
   B: setupBel('B0'),        // Belüftung
   P: setupPW(null),         // Abwasserpumpwerk Talstraße
+  O: setupOst(null),        // Abwasserpumpwerk Industriegebiet Ost (APW-02)
   diagnose: null,           // in der Meldung gewählte Störungsursache
   speed: 60,                // Simulationssekunden je Echtzeitsekunde
   paused: false,
@@ -48,15 +50,16 @@ function stepAll(dt) {
   sim.S.pGeb = sim.B.pkw;
   stepFaul(sim.S, dt, logSys);
   stepPW(sim.P, dt, logSys);
+  stepOst(sim.O, dt, logSys);
 }
 function run(dt) { let r = dt; while (r > 0) { const d = Math.min(30, r); stepAll(d); r -= d; } }
 
 // Pumpwerk auf die gemeinsame Simulationszeit verschieben (Verlauf und Meldungen mit)
 function syncPW(P, t) { const d = t - P.t; P.t = t; P.histNext += d; P.hist.forEach((h) => { h.t += d; }); }
 
-export function startSzenario({ faul = 'S0', bel = 'B0', pw = null, pwOpt = {}, speed, titel } = {}) {
-  sim.S = setupFaul(faul); sim.B = setupBel(bel); sim.P = setupPW(pw, pwOpt); sim.diagnose = null;
-  sim.B.t = sim.S.t; syncPW(sim.P, sim.S.t);
+export function startSzenario({ faul = 'S0', bel = 'B0', pw = null, pwOpt = {}, ost = null, speed, titel } = {}) {
+  sim.S = setupFaul(faul); sim.B = setupBel(bel); sim.P = setupPW(pw, pwOpt); sim.O = setupOst(ost); sim.diagnose = null;
+  sim.B.t = sim.S.t; syncPW(sim.P, sim.S.t); syncPW(sim.O, sim.S.t);
   sim.speed = speed ?? sim.speed; sim.log.length = 0; sim.t0real = performance.now();
   logSys(`Start ${titel || `Szenario ${faul}/${bel}`} · Zeitraffer ×${sim.speed}`);
   run(1);
@@ -66,5 +69,5 @@ export function startSzenario({ faul = 'S0', bel = 'B0', pw = null, pwOpt = {}, 
 
 export function simTick(dtReal) { if (!sim.paused) run(Math.min(1, dtReal) * sim.speed); }
 
-syncPW(sim.P, sim.S.t);
+syncPW(sim.P, sim.S.t); syncPW(sim.O, sim.S.t);
 startSzenario({ titel: 'Normalbetrieb' });

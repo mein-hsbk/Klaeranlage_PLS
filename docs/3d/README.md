@@ -34,6 +34,16 @@ an der Pumpe (Abhören, Lagertemperatur, Schwingschnelle nach DIN ISO 10816-3, S
 sich aus: Trockenlauf (TSA löst aus, Dichtung gefährdet), Lauf gegen geschlossenen Druckschieber, Entleeren bei offenen
 Schiebern (Wassermelder), Reparaturschalter unter Last, Notüberlauf.
 
+**Abwasserpumpwerk Industriegebiet Ost** (APW-02, östlich des Schwierbachs im Gewerbegebiet, Station „PW Ind.-Ost“,
+Leitwarten-Reiter „PW Ind.-Ost“): Situation der LS „Bernoulli-Gleichung / Anlagenkennlinie“. P-001 wurde vor zwei Tagen
+gegen eine neue Pumpe mit Frequenzumrichter getauscht (Auslegung 80 m³/h bei 22 m für die alte Leitung DN 150),
+gleichzeitig wurde die Druckleitung DL-02 (400 m) mit PE-HD da 140 × 8,3 (d_i 123,4 mm) gelinert. P-002 ist die alte
+Pumpe (Festdrehzahl). Pumpenkennlinien wie im Arbeitsblatt, Rohrreibung nach Colebrook mit k = 0,05 mm (entspricht dem
+KSB-Diagramm „neue rohe Stahlrohre“), zusätzlich Einzelverluste; Parallelbetrieb über die gemeinsame Druckleitung,
+H_geo = 20,20 m − Pegel. Vor Ort: Manometer saug-/druckseitig (Δz 0,50 m, Stutzen DN 125/DN 100), Druckmessumformer in der
+Pumpensteuerung, FI-101, FU-Bedienteil (Sollwertquelle FERN/ORT, Handsollwert 25–50 Hz), „Messwerte notieren“,
+Spitzenlast-Zuschaltung von P-002 (nach dem Umbau gesperrt), Anlagendokumentation als Aushang.
+
 **Werkstatt** (Stufe 2): Ist P-001 sicher freigeschaltet (Reparaturschalter 0 mit Schloss, beide Schieber zu,
 entleert), lässt sich an der Pumpe die Einschubeinheit ausbauen (Rückziehbauweise, das Spiralgehäuse bleibt in der
 Rohrleitung). Die Werkstatt zeigt die Pumpe als Explosionsdarstellung (eigener Renderer, Zerlegen per Regler,
@@ -61,6 +71,7 @@ Browser mit jsPDF (`vendor/jspdf.umd.min.js`, wird erst beim ersten Speichern ge
 | Pumpe: Störung bis Wiederinbetriebnahme | Zufallskarte, komplette Kette: Diagnose → Außerbetriebnahme → Werkstatt → Wiederinbetriebnahme mit Probelauf |
 | Pumpe instand setzen (Werkstatt) | Einschubeinheit liegt bereits in der Werkstatt (nur Ursachen an der Pumpe): Befund, Instandsetzung, Kosten, Einbau, Wiederinbetriebnahme |
 | Pegelmessung PW Talstraße unplausibel | Messkette LI-001: hydrostatische Sonde 0–5 mWS, 4–20 mA, Einbau 0,10 m über Sohle → Klemmenkasten am Sumpf (Prüfbuchse) → Trennverstärker → Steuerung; Bezug OK Lukenrahmen 3,95 m. Ursache je Start zufällig: Leitungsunterbrechung, Feuchtigkeit im Klemmenkasten, Kapillare der Sonde, Sonde verrutscht/verschlammt, Messbereich falsch parametriert, Trennverstärker defekt, Hochwasserschwimmer verhakt. **Mindestpensum** unabhängig von der Ursache (Abstich, Schleifenstrom, Trennverstärker Ein/Aus, alle Schwimmer, Messprotokoll vor und nach der Instandsetzung, Arbeiten nur im Schwimmer-Notbetrieb) – Glückstreffer ohne Messungen erreichen höchstens ~9 von 16 Punkten. Messprotokoll-Eintragungen werden gegen die eigenen Messungen geprüft |
+| PW Industriegebiet Ost: Förderstrom zu gering | LS Bernoulli/Anlagenkennlinie: Betriebspunkt ≈ 58–60 m³/h statt 80 (steilere Anlagenkennlinie nach Relining). Messreihe mit FU (P-002 aus, P-001 HAND, FU ORT, 50 … 40 Hz) → Punkte auf der Anlagenkennlinie, unter ≈ 41 Hz keine Förderung. Sofortmaßnahme Spitzenlast/Parallelbetrieb; Bericht mit Tabelle der notierten Messwerte, Musterlösung mit berechneten Förderhöhen. Zeitraffer ×5 |
 
 Die vollständigen Lösungshinweise stehen im Missionsmenü (aufklappbar) und in `js/missionen.js`.
 Neue Missionen: Eintrag in `MISSIONEN` mit Szenario-Codes (`faul`, `bel`, `pw`), Startstation, Auftrag und Prüfschritten.
@@ -75,6 +86,8 @@ Im Prüfungsmodus sind Beschriftungen, Schnellwahl und Erklärtexte ausgeblendet
 | `js/belueftung-modell.js` | Prozessmodell Belüftung: 2 Straßen, PI-Regler, Drehkolbengebläse, Sondenzustand, Szenarien B0/B1 |
 | `js/pumpwerk-modell.js` | Prozessmodell Pumpwerk Talstraße: Kennlinien, Betriebspunkt, NPSH, Niveausteuerung, Störungskarten und -ursachen, Bedienhandlungen |
 | `js/pumpwerk-szene.js` | 3D des Pumpwerks mit Pumpenaggregaten, Armaturen, Instrumenten, Schaltkästen, Steuerung |
+| `js/pwost-modell.js` | Prozessmodell PW Industriegebiet Ost: Kennlinien, Colebrook, Parallelbetrieb, FU, Messwerte |
+| `js/pwost-szene.js` | 3D des PW Industriegebiet Ost mit Instrumenten, FU, Steuerung, Anlagendokumentation, Gewerbehallen |
 | `js/werkstatt.js` | Werkstatt: Explosionsdarstellung der Einschubeinheit, Befund, Messungen, Instandsetzung, Einbau |
 | `js/anlage-sim.js` | gemeinsamer Zustand, Zeitraffer, Kopplung der Modelle, Protokoll |
 | `js/instrumente.js` | Zeichenfunktionen und Registry der Vor-Ort-Instrumente |
@@ -109,5 +122,6 @@ Lüftung mit Aktivkohlefilter, Grundwassermessstelle, Lageplan im Bestandsordner
 
 Missionen sind nach Lernfeldern (Umwelttechnologe/-in für Abwasserbewirtschaftung) gruppiert und nummeriert
 (`LERNFELDER`, `ZUORDNUNG` in `js/missionen.js`): 0 Freies Üben · LF 4: 4.1 Sammelbecken Bahnhofstraße prüfen ·
-LF 6: 6.1–6.4 Störungskarten PW Talstraße, 6.5 Zufallskarte, 6.6 Werkstatt, 6.7 Störung bis Wiederinbetriebnahme ·
+LF 6: 6.1–6.4 Störungskarten PW Talstraße, 6.5 Zufallskarte, 6.6 Werkstatt, 6.7 Störung bis Wiederinbetriebnahme,
+6.8 PW Industriegebiet Ost: Förderstrom zu gering (Bernoulli/Anlagenkennlinie) ·
 LF 12: 12.1 BHKW steht, 12.2 Faulturm kühlt aus · LF 15: 15.1 Stromfresser Gebläsestation, 15.2 Pegelmessung PW Talstraße unplausibel.

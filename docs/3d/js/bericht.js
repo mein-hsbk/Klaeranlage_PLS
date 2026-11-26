@@ -16,19 +16,20 @@ export function sammleBericht(m, ctx) {
   const checks = ((typeof m.checks === 'function' ? m.checks() : m.checks) || []).map(([text, f, warum]) => ({ text, ok: !!f(), warum: warum || '' }));
   const ende = m.werte ? m.werte() : [];
   const werte = (ctx.werteStart || []).map(([n, v, u], i) => [n, v, ende[i] ? ende[i][1] : '–', u]);
-  const hist = { S: [...sim.S.hist, { t: tEnd, ...lastS() }], B: [...sim.B.hist, { t: tEnd, ...lastB() }], P: [...sim.P.hist, { t: tEnd, ...lastP() }], H: sim.H ? [...sim.H.hist, { t: tEnd, h: sim.H.h, qz: (sim.H.hist.at(-1) || {}).qz, np: sim.H.p.filter((p) => p.run).length }] : [] };
+  const hist = { S: [...sim.S.hist, { t: tEnd, ...lastS() }], B: [...sim.B.hist, { t: tEnd, ...lastB() }], P: [...sim.P.hist, { t: tEnd, ...lastP() }], H: sim.H ? [...sim.H.hist, { t: tEnd, h: sim.H.h, qz: (sim.H.hist.at(-1) || {}).qz, np: sim.H.p.filter((p) => p.run).length }] : [], O: [...sim.O.hist, { t: tEnd, ...lastO() }] };
   return {
     titel: m.titel, bereich: m.bereich, name: ctx.name || '', datum: new Date().toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'short' }),
     dauer: mmss(performance.now() - ctx.t0), simVon: zeit(tStart), simBis: zeit(tEnd), speed: sim.speed, exam: ctx.exam,
     auftrag: m.auftragStart || m.auftrag, checks, kennzahl: m.kennzahl ? m.kennzahl() : '', kzTitel: m.kennzahlTitel || 'Energie / Kennzahl', werte,
     charts: (m.charts || []).map((c) => ({ ...c, t0: tStart - (m.vorlauf || 2) * 3600, t1: tEnd, tStart, data: hist[c.src] })),
-    hinweise: m.hinweise ? m.hinweise(ereignisse) : [], ereignisse, alarme,
+    hinweise: m.hinweise ? m.hinweise(ereignisse) : [], ereignisse, alarme, tabellen: m.tabellen ? m.tabellen() : [],
     meldungen: ereignisse.filter((e) => e.art === 'meldung').map((e) => e.text.replace(/^MELDUNG an Schichtleitung: /, '')),
     lehrer: m.lehrerBericht ? m.lehrerBericht() : m.lehrer,
   };
 }
 function lastS() { const S = sim.S; return { lvl: S.V / 6, q: S.qProd, pel: S.pel, T: S.T_ft, ch4: S.ch4, f: S.fackel ? 1 : 0 }; }
 function lastP() { const P = sim.P; return { li: P.lm && !P.lm.valid ? 0 : (P.lm ? P.lm.liAnz : P.li), lw: P.li, q: P.q, q1: P.p[0].q, q2: P.p[1].q, i1: P.p[0].amp, i2: P.p[1].amp, v1: P.p[0].v, vor: P.p[0].vorlage }; }
+function lastO() { const O = sim.O; return { li: O.li, q: O.q, q1: O.p[0].q, q2: O.p[1].q, f1: O.p[0].f, i1: O.p[0].amp, i2: O.p[1].amp, qin: O.qIn }; }
 function lastB() { const B = sim.B; return { m1: B.s[0].meas, m2: B.s[1].meas, o1: B.s[0].o2, o2: B.s[1].o2, l1: B.s[0].L, l2: B.s[1].L, p: B.pkw, pr: B.pref, nh4: B.nh4 }; }
 
 // ------------------------------------------------------------------ Diagramm (Bildschirm und PDF)
@@ -95,6 +96,7 @@ export function renderBericht(el, r) {
     <ul class="chk">${r.checks.map((c) => `<li class="${c.ok ? 'ok' : 'no'}">${c.ok ? '✓' : '✗'} ${esc(c.text)}${c.warum ? `<div class="why">${esc(c.warum)}</div>` : ''}</li>`).join('')}</ul>` : ''}
     ${r.kennzahl ? `<p class="kz">${esc(r.kennzahl)}</p>` : ''}
     ${r.hinweise.length ? `<h3>Beobachtungen zum Vorgehen</h3><ul class="hw">${r.hinweise.map((h) => `<li>${esc(h)}</li>`).join('')}</ul>` : ''}
+    ${r.tabellen.map((tb) => `<h3>${esc(tb.titel)}</h3>${tb.sub ? `<div class="sub">${esc(tb.sub)}</div>` : ''}${tb.zeilen.length ? `<table class="rpT"><tr>${tb.kopf.map((k) => `<th>${esc(k)}</th>`).join('')}</tr>${tb.zeilen.map((z) => `<tr>${z.map((c, j) => `<td${j ? ' class="n"' : ''}>${esc(c)}</td>`).join('')}</tr>`).join('')}</table>` : '<p class="sub">Keine Einträge.</p>'}`).join('')}
     ${r.werte.length ? `<h3>Prozesswerte zu Beginn und am Ende</h3><table class="rpT"><tr><th>Größe</th><th>Start</th><th>Ende</th><th></th></tr>${r.werte.map(([n, a, b, u]) => `<tr><td>${esc(n)}</td><td class="n">${esc(a)}</td><td class="n">${esc(b)}</td><td>${esc(u)}</td></tr>`).join('')}</table>` : ''}
     ${r.charts.length ? `<h3>Verlauf in der Leitwarte</h3><div class="sub">Gestrichelte grüne Linie: Missionsstart. Gelbe Nummern: eigene Handlungen (siehe Zeitstrahl).</div>${r.charts.map((_, i) => `<canvas class="rpC" data-i="${i}"></canvas>`).join('')}` : ''}
     <h3>Zeitstrahl der Handlungen</h3>
@@ -171,6 +173,7 @@ export async function berichtAlsPDF(r, { musterloesung = false } = {}) {
   }
   if (r.kennzahl) { h2(r.kzTitel); text(r.kennzahl, { size: 10 }); }
   if (r.hinweise.length) { h2('Beobachtungen zum Vorgehen'); for (const h of r.hinweise) text(`•  ${h}`, { size: 9.6 }); }
+  for (const tb of r.tabellen) { h2(tb.titel); if (tb.sub) text(tb.sub, { size: 8.8, color: [90, 98, 108] }); if (tb.zeilen.length) tabelle(tb.kopf, tb.zeilen, tb.breiten || tb.kopf.map(() => CW / tb.kopf.length)); else text('Keine Einträge.'); }
   if (r.werte.length) { h2('Prozesswerte zu Beginn und am Ende'); tabelle(['Größe', 'Start', 'Ende', 'Einheit'], r.werte, [86, 30, 30, CW - 146]); }
   if (r.charts.length) {
     h2('Verlauf in der Leitwarte');
