@@ -54,7 +54,7 @@ export const PEGEL_KARTE = { kurz: 'Pegelmessung unplausibel', titel: 'Niveaumes
 export const LI = { BEZUG: 3.95, EINBAU: 0.10, MB: 5, S1: 0.45, S1_AUS: 0.7, S2: 2.0, S3: 2.5, NACHLAUF: 1500 };
 function createLM() {
   return { ursache: null, mbPar: LI.MB, sondeOut: false, lage: 'ok', schlamm: false, kap: false, ader: true, feucht: false, kkOffen: false, trenn: true,
-    modus: 'sonde', hwHaengt: false, iSf: 4, iLoop: 4, iOut: 4, liAnz: 0, valid: true, s1: false, s2: false, s3: false, nach: 0, proto: [], getauscht: { sonde: 0, trenn: 0 }, behobenT: null };
+    modus: 'sonde', hwHaengt: false, iSf: 4, iLoop: 4, iOut: 4, liAnz: 0, valid: true, s1: false, s2: false, s3: false, nach: 0, mess: [], prot: { vor: null, nach: null }, getauscht: { sonde: 0, trenn: 0 }, behobenT: null };
 }
 function stepLM(pw, dt, log) {
   const L = pw.lm, t = pw.t;
@@ -413,7 +413,9 @@ const n2 = (x) => x.toFixed(2).replace('.', ','), nmA = (x) => x.toFixed(2).repl
 const imSonde = (pw) => (pw.lm.modus === 'sonde' ? ' – Niveausteuerung lief im Sondenbetrieb!' : '');
 export const lmBehoben = (pw) => { const L = pw.lm, u = L.ursache; return !u || ({ kabel: L.ader, feucht: !L.feucht, kap: !L.kap, schlamm: !L.schlamm && L.lage === 'ok', skal: L.mbPar === LI.MB, trenn: L.trenn, hw: !L.hwHaengt })[u]; };
 function merkBehoben(pw, log) { if (pw.lm.ursache && lmBehoben(pw) && pw.lm.behobenT === null) { pw.lm.behobenT = pw.t; log(`LI-001 Instandsetzung abgeschlossen`, 'sys'); } }
-export function abstich(pw, log) { const a = LI.BEZUG - pw.li + (Math.random() - 0.5) * 0.01; log(`Abstich LI-001 (Lichtlot ab OK Lukenrahmen): ${n2(a)} m`, 'messung'); pw.lm.abstich = { a, t: pw.t, anz: pw.lm.valid ? pw.lm.liAnz : null }; return `Lichtlot: Wasserspiegel ${n2(a)} m unter OK Lukenrahmen.`; }
+// Messwerte merken (Zeit, Phase, Anzeige im selben Moment) – Grundlage für die Prüfung der Protokolle
+function merkMess(pw, k, v) { const L = pw.lm; L.mess.push({ k, v: Math.round(v * 100) / 100, t: pw.t, nach: L.behobenT !== null, anz: L.valid ? Math.round(L.liAnz * 100) / 100 : null }); }
+export function abstich(pw, log) { const a = LI.BEZUG - pw.li + (Math.random() - 0.5) * 0.01; log(`Abstich LI-001 (Lichtlot ab OK Lukenrahmen): ${n2(a)} m`, 'messung'); pw.lm.abstich = { a, t: pw.t, anz: pw.lm.valid ? pw.lm.liAnz : null }; merkMess(pw, 'ab', a); return `Lichtlot: Wasserspiegel ${n2(a)} m unter OK Lukenrahmen.`; }
 export function schwimmerPruefen(pw, k, log) {
   const L = pw.lm, nm = ['', 'S1 Trockenlauf', 'S2 Notbetrieb EIN', 'S3 Hochwasser'][k];
   let t;
@@ -447,7 +449,7 @@ export function kkSicht(pw, log) {
 }
 export function kkMessen(pw, art, log) {
   const L = pw.lm; let t;
-  if (art === 'loop') { const i = L.iLoop + (L.iLoop > 0 ? (Math.random() - 0.5) * 0.02 : 0); L.iGem = { i, t: pw.t }; t = `Schleifenstrom an der Prüfbuchse der Trennklemme: ${nmA(i)} mA`; }
+  if (art === 'loop') { const i = L.iLoop + (L.iLoop > 0 ? (Math.random() - 0.5) * 0.02 : 0); L.iGem = { i, t: pw.t }; merkMess(pw, 'loop', i); t = `Schleifenstrom an der Prüfbuchse der Trennklemme: ${nmA(i)} mA`; }
   else if (!L.kkOffen) return 'Für diese Messung den Klemmenkasten öffnen.';
   else if (art === 'sonde') t = `Strom in der Sondenader (Multimeter in Reihe): ${nmA(L.ader ? L.iSf : 0)} mA${L.sondeOut ? ' (Sonde an Luft)' : ''}`;
   else t = `Spannung an den Sondenklemmen X1:1/X1:2: ${L.ader ? '15,6' : '24,1'} V`;
@@ -455,14 +457,13 @@ export function kkMessen(pw, art, log) {
 }
 export function aderAuflegen(pw, log) { const L = pw.lm; if (!L.kkOffen) return 'Erst öffnen.'; if (L.ader) return 'Alle Adern fest.'; L.ader = true; log(`Ader 1 an X1:1 gekürzt, neu abisoliert, neue Aderendhülse, aufgelegt${imSonde(pw)}`); merkBehoben(pw, log); return 'Ader neu aufgelegt.'; }
 export function kkTrocknen(pw, log) { const L = pw.lm; if (!L.kkOffen) return 'Erst öffnen.'; L.feucht = false; log(`Klemmenkasten getrocknet, Klemmen gereinigt, Deckeldichtung und Kabelverschraubung erneuert${imSonde(pw)}`); merkBehoben(pw, log); return 'Klemmenkasten trocken, neue Dichtung.'; }
-export function tvMessen(pw, wo, log) { const L = pw.lm, i = wo === 'ein' ? L.iLoop : L.iOut; const t = `Trennverstärker ${wo === 'ein' ? 'Eingang (Feldseite)' : 'Ausgang (zur Steuerung)'}: ${nmA(i + (i > 0 ? (Math.random() - 0.5) * 0.02 : 0))} mA`; log(`LI-001 ${t}`, 'messung'); return t; }
+export function tvMessen(pw, wo, log) { const L = pw.lm, i0 = wo === 'ein' ? L.iLoop : L.iOut, i = i0 + (i0 > 0 ? (Math.random() - 0.5) * 0.02 : 0); merkMess(pw, wo === 'ein' ? 'tvE' : 'tvA', i); const t = `Trennverstärker ${wo === 'ein' ? 'Eingang (Feldseite)' : 'Ausgang (zur Steuerung)'}: ${nmA(i)} mA`; log(`LI-001 ${t}`, 'messung'); return t; }
 export function tvTauschen(pw, log) { const L = pw.lm; L.trenn = true; L.getauscht.trenn++; log(`Trennverstärker LI-001 gegen Ersatzgerät aus dem Lager getauscht${imSonde(pw)}`); merkBehoben(pw, log); return 'Trennverstärker getauscht.'; }
 export function setNiveauModus(pw, m, log) { const L = pw.lm; if (m === L.modus) return null; if (m === 'sonde' && !L.valid) return 'Sondenbetrieb nicht möglich – Messwert gestört.'; L.modus = m; log(`Niveausteuerung auf ${m === 'sonde' ? 'Sondenbetrieb (LI-001)' : 'Schwimmer-Notbetrieb'} umgeschaltet`); return null; }
 export function setMessbereich(pw, v, log) { const L = pw.lm, a = L.mbPar; L.mbPar = clamp(Math.round(v * 100) / 100, 1, 10); log(`Parameter LI-001 Messbereichsendwert ${n2(a)} → ${n2(L.mbPar)} m${imSonde(pw)}`); merkBehoben(pw, log); }
-export function messprotokoll(pw, e, log) {
-  const L = pw.lm, ab = L.abstich, ig = L.iGem;
-  const w = { pegel: ab ? LI.BEZUG - ab.a : pw.li, abstich: ab ? ab.a : null, abT: ab ? ab.t : null, anzAb: ab ? ab.anz : null, iGem: ig ? ig.i : null, iT: ig ? ig.t : null, anz: L.valid ? L.liAnz : null, iLoop: L.iLoop, t: pw.t, behoben: lmBehoben(pw) };
-  L.proto.push({ e, w });
-  const f = (x) => (x === '' || x == null ? '–' : x);
-  log(`MESSPROTOKOLL LI-001: Abstich ${f(e.abstich)} m · Pegel berechnet ${f(e.pegel)} m · Anzeige LI-001 ${f(e.anz)} m · Strom gemessen ${f(e.iMess)} mA · Strom berechnet ${f(e.iSoll)} mA${e.bem ? ' · ' + e.bem : ''}`, 'messung');
+export const PROT_ART = { vor: 'vor der Instandsetzung', nach: 'nach der Instandsetzung' };
+export function protokollAblegen(pw, art, e, log) {
+  const L = pw.lm, neu = !L.prot[art]; L.prot[art] = { e: { ...e }, t: pw.t };
+  const f = (x) => (x === '' || x == null ? '–' : x), b = (x) => ({ io: 'i. O.', nio: 'n. i. O.' })[x] || '–';
+  log(`MESSPROTOKOLL LI-001 (${PROT_ART[art]}) ${neu ? 'abgelegt' : 'überarbeitet'}: Abstich ${f(e.abstich)} m, Pegel ${f(e.pegel)} m · Prüfbuchse ${f(e.iPb)} mA (Soll lt. Kennlinie ${f(e.iSoll)} mA, ${b(e.bFeld)}) · Trennverstärker ${f(e.iTvE)} / ${f(e.iTvA)} mA (${b(e.bTv)}) · Anzeige ${f(e.anz)} m (${b(e.bSt)}) · Schwimmer ${b(e.bSchw)}${e.bem ? ' · ' + e.bem : ''}`, 'messung');
 }

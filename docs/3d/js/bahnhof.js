@@ -304,16 +304,16 @@ export function buildBahnhof(scene, h, hooks = {}) {
       ctx.fillStyle = '#2f6fa8'; ctx.beginPath(); ctx.arc(X(-253.2), Z(66.6), 5, 0, 7); ctx.fill(); ctx.fillText('GWM 3', X(-252.7), Z(66.2));
       ctx.fillStyle = '#5a4820'; ctx.font = `italic ${W * 0.018}px Georgia`; ctx.fillText('Maße in der Örtlichkeit prüfen. Abstände nicht abgreifen!', W * 0.02, Hc - W * 0.035);
     } });
-  makeInst('bh_lueft', { name: 'Be- und Entlüftung mit Aktivkohlefilter', tag: 'Lüftung', pos: [-246.2, 1.4, 73.52], rotY: Math.PI, size: 0.16, aspect: 1.2, res: 128,
+  makeInst('bh_lueft', { name: 'Be- und Entlüftung mit Aktivkohlefilter', tag: 'Lüftung', pos: [-246.2, 1.4, 73.52], rotY: Math.PI, size: 0.16, aspect: 1.2, res: 256,
     info: 'Beim Füllen verdrängt das Abwasser die Luft im Becken. Sie entweicht über den Aktivkohlefilter, damit es in der Bahnhofstraße nicht riecht. Erschöpfte Kohle lässt Geruch (H₂S) durch.',
-    draw: plate('AKF', '#d1f2eb'),
+    draw: plate('AKF\nBe-/Entlüftung', '#d1f2eb'),
     detail: (ctx, W, Hc) => senses(ctx, W, Hc, 'Lüftung mit Aktivkohlefilter', B.filter === 'alt' ? ['Deutlicher Geruch nach faulen Eiern am Austritt.', 'Prüfaufkleber Filtertausch: 04/2022.', 'Anwohnerbeschwerde im Ordner vermerkt.'] : ['Kein Geruch wahrnehmbar.', 'Prüfaufkleber Filtertausch: aktuell.'], true),
     actions: () => [{ label: 'Geruch am Austritt prüfen', fn: () => mess(B.filter === 'alt' ? 'Lüftung: deutlicher H₂S-Geruch am Austritt, Aktivkohle laut Aufkleber zuletzt 04/2022 getauscht' : 'Lüftung: geruchlos') }] });
   makeInst('bh_gwm', { name: 'Grundwassermessstelle GWM 3', tag: 'GWM 3', pos: [-253.2, 0.66, 66.6], rotY: 0, size: 0.14, round: true, res: 128,
     info: 'Grundwassermessstelle (Pegelrohr) am Grundstücksrand. Der Grundwasserstand ist wichtig für Bauarbeiten: Baugrube, Wasserhaltung, Auftriebssicherheit eines leeren Beckens.',
     draw: plate('GWM 3', '#74b9ff'),
     actions: () => [{ label: 'Grundwasserstand messen (Lichtlot)', fn: () => mess('Grundwassermessstelle GWM 3: Abstich 2,35 m unter Geländeoberkante') }] });
-  makeInst('bh_beton', { name: 'Betonoberfläche an der Einstiegsöffnung', tag: 'Beton', pos: [-250.4, ok - 0.2, 72.84], rotY: Math.PI, size: 0.14, aspect: 0.6, res: 128,
+  makeInst('bh_beton', { name: 'Betonoberfläche an der Einstiegsöffnung', tag: 'Beton', pos: [-250.4, ok - 0.2, 72.84], rotY: Math.PI, size: 0.14, aspect: 0.6, res: 256,
     info: 'Wandoberfläche direkt unter der Einstiegsöffnung (Gasraum). Hier lassen sich Abklopfen und Rückprallhammer ansetzen.',
     draw: plate('Beton', '#bdc3c7'),
     actions: () => [
